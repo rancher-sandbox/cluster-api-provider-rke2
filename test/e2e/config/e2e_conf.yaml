@@ -1,0 +1,95 @@
+managementClusterName: caprke2-e2e
+
+images:
+  - name: ghcr.io/rancher-sandbox/cluster-api-provider-rke2-bootstrap:dev
+    loadBehavior: mustLoad
+  - name: ghcr.io/rancher-sandbox/cluster-api-provider-rke2-controlplane:dev
+    loadBehavior: mustLoad
+
+providers:
+  - name: cluster-api
+    type: CoreProvider
+    versions:
+      - name: v1.3.0
+        value: https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.3.0/core-components.yaml
+        type: url
+        contract: v1beta1
+        files:
+          - sourcePath: "../data/shared/v1beta1/metadata.yaml"
+        replacements:
+          - old: "imagePullPolicy: Always"
+            new: "imagePullPolicy: IfNotPresent"
+          - old: "--leader-elect"
+            new: "--leader-elect=false"
+  - name: docker
+    type: InfrastructureProvider
+    versions:
+      - name: v1.3.0
+        value: "https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.3.0/infrastructure-components-development.yaml"
+        type: url
+        files:
+          - sourcePath: "../../../test/e2e/data/infrastructure/cluster-template-docker.yaml"
+          - sourcePath: "../data/shared/v1beta1/metadata.yaml"
+        replacements:
+          - old: "imagePullPolicy: Always"
+            new: "imagePullPolicy: IfNotPresent"
+          - old: "--leader-elect"
+            new: "--leader-elect=false"
+          - old: --metrics-addr=127.0.0.1:8080
+            new: --metrics-addr=:8080
+        contract: v1beta1
+
+  - name: rke2-control-plane
+    type: ControlPlaneProvider
+    versions:
+      - name: v0.1.99
+        value: "../../../controlplane/config/default"
+        contract: v1beta1
+        files:
+          - sourcePath: "../../../metadata.yaml"
+            targetName: "metadata.yaml"
+        replacements:
+          - old: "imagePullPolicy: Always"
+            new: "imagePullPolicy: IfNotPresent"
+          - old: "--leader-elect"
+            new: "--leader-elect=false"
+  - name: rke2-bootstrap
+    type: BootstrapProvider
+    versions:
+      - name: v0.1.99
+        value: ../../../bootstrap/config/default
+        contract: v1beta1
+        files:
+          - sourcePath: "../../../metadata.yaml"
+            targetName: "metadata.yaml"
+        replacements:
+          - old: "imagePullPolicy: Always"
+            new: "imagePullPolicy: IfNotPresent"
+          - old: "--leader-elect"
+            new: "--leader-elect=false"
+
+variables:
+  KUBERNETES_VERSION_MANAGEMENT: "v1.24.4"
+  KUBERNETES_VERSION: "v1.24.4"
+  NODE_DRAIN_TIMEOUT: "60s"
+  CONFORMANCE_WORKER_MACHINE_COUNT: "2"
+  CONFORMANCE_CONTROL_PLANE_MACHINE_COUNT: "1"
+  KUBERNETES_VERSION_UPGRADE_TO: "v1.24.2"
+  KUBERNETES_VERSION_UPGRADE_FROM: "v1.23.8"
+  KUBERNETES_UPGRADE_OCI_IMAGE_ID: "${KUBERNETES_UPGRADE_OCI_IMAGE_ID}"
+  IP_FAMILY: "IPv4"
+  EXP_CLUSTER_RESOURCE_SET: "true"
+  EXP_KUBEADM_BOOTSTRAP_FORMAT_IGNITION: "true"
+  EXP_MACHINE_POOL: "true"
+
+intervals:
+  default/wait-controllers: ["3m", "10s"]
+  default/wait-cluster: ["20m", "10s"]
+  default/wait-control-plane: ["30m", "10s"]
+  default/wait-worker-nodes: ["30m", "10s"]
+  default/wait-delete-cluster: ["20m", "10s"]
+  default/wait-machine-upgrade: ["50m", "10s"]
+  default/wait-machine-remediation: ["30m", "10s"]
+  default/wait-deployment: ["5m", "10s"]
+  default/wait-job: ["5m", "10s"]
+  default/wait-service: ["3m", "10s"]

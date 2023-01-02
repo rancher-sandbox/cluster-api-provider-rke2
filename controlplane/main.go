@@ -40,7 +40,6 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -168,12 +167,13 @@ func main() {
 }
 
 func setupChecks(mgr ctrl.Manager) {
-	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+	if err := mgr.AddHealthzCheck("healthz", mgr.GetWebhookServer().StartedChecker()); err != nil {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
+
+	if err := mgr.AddReadyzCheck("webhook", mgr.GetWebhookServer().StartedChecker()); err != nil {
+		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
 }

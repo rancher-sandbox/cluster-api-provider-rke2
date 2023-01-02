@@ -34,7 +34,6 @@ import (
 
 	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/machinefilters"
 
-	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/conditions"
 )
 
@@ -77,7 +76,7 @@ func (s FilterableMachineCollection) Difference(machines FilterableMachineCollec
 
 // SortedByCreationTimestamp returns the machines sorted by creation timestamp
 func (s FilterableMachineCollection) SortedByCreationTimestamp() []*clusterv1.Machine {
-	res := make(util.MachinesByCreationTimestamp, 0, len(s))
+	res := make(machinesByCreationTimestamp, 0, len(s))
 	for _, value := range s {
 		res = append(res, value)
 	}
@@ -164,4 +163,16 @@ func (s FilterableMachineCollection) Names() []string {
 		names = append(names, m.Name)
 	}
 	return names
+}
+
+// machinesByCreationTimestamp sorts a list of Machine by creation timestamp, using their names as a tie breaker.
+type machinesByCreationTimestamp []*clusterv1.Machine
+
+func (o machinesByCreationTimestamp) Len() int      { return len(o) }
+func (o machinesByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o machinesByCreationTimestamp) Less(i, j int) bool {
+	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
+		return o[i].Name < o[j].Name
+	}
+	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }

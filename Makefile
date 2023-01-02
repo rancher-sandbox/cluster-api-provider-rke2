@@ -44,6 +44,9 @@ TOOLS_DIR := hack/tools
 TOOLS_BIN_DIR := $(abspath $(TOOLS_DIR)/$(BIN_DIR))
 CAPRKE2_DIR := controlplane
 CAPBPR_DIR := bootstrap
+E2E_DATA_DIR ?= $(ROOT_DIR)/test/e2e/data
+E2E_CONF_FILE ?= $(ROOT_DIR)/test/e2e/config/e2e_conf.yaml
+E2E_CONF_FILE_ENVSUBST := $(ROOT_DIR)/test/e2e/config/rke2-ci-envsubst.yaml
 
 export PATH := $(abspath $(TOOLS_BIN_DIR)):$(PATH)
 
@@ -332,6 +335,56 @@ kind-cluster: ## Create a new kind cluster designed for development with Tilt
 .PHONY: tilt-up
 tilt-up: kind-cluster ## Start tilt and build kind cluster if needed.
 	tilt up
+
+## --------------------------------------
+## E2E
+## --------------------------------------
+
+##@ e2e:
+
+# Allow overriding the e2e configurations
+GINKGO_FOCUS ?= Workload cluster creation
+GINKGO_SKIP ?= API Version Upgrade
+GINKGO_NODES ?= 1
+GINKGO_NOCOLOR ?= false
+GINKGO_ARGS ?=
+GINKGO_TIMEOUT ?= 2h
+GINKGO_POLL_PROGRESS_AFTER ?= 10m
+GINKGO_POLL_PROGRESS_INTERVAL ?= 1m
+ARTIFACTS ?= $(ROOT_DIR)/_artifacts
+SKIP_CLEANUP ?= false
+SKIP_CREATE_MGMT_CLUSTER ?= false
+
+.PHONY: test-e2e-run
+test-e2e-run: $(ENVSUBST) $(KUBECTL) $(GINKGO) e2e-image ## Run the end-to-end tests
+	$(ENVSUBST) < $(E2E_CONF_FILE) > $(E2E_CONF_FILE_ENVSUBST) && \
+	time $(GINKGO) -v --trace -poll-progress-after=$(GINKGO_POLL_PROGRESS_AFTER) -poll-progress-interval=$(GINKGO_POLL_PROGRESS_INTERVAL) \
+	--tags=e2e --focus="$(GINKGO_FOCUS)" -skip="$(GINKGO_SKIP)" --nodes=$(GINKGO_NODES) --no-color=$(GINKGO_NOCOLOR) \
+	--timeout=$(GINKGO_TIMEOUT) --output-dir="$(ARTIFACTS)" --junit-report="junit.e2e_suite.1.xml" $(GINKGO_ARGS) ./test/e2e -- \
+		-e2e.artifacts-folder="$(ARTIFACTS)" \
+		-e2e.config="$(E2E_CONF_FILE_ENVSUBST)" \
+		-e2e.skip-resource-cleanup=$(SKIP_CLEANUP) \
+		-e2e.use-existing-cluster=$(SKIP_CREATE_MGMT_CLUSTER) $(E2E_ARGS)
+
+.PHONY: test-e2e
+test-e2e: ## Run the end-to-end tests
+	$(MAKE) test-e2e-run
+
+LOCAL_GINKGO_ARGS ?=
+LOCAL_GINKGO_ARGS += $(GINKGO_ARGS)
+.PHONY: test-e2e-local
+test-e2e-local: ## Run e2e tests
+	PULL_POLICY=IfNotPresent MANAGER_IMAGE=$(CONTROLLER_IMG)-$(ARCH):$(TAG) \
+	$(MAKE) docker-build \
+	GINKGO_ARGS='$(LOCAL_GINKGO_ARGS)' \
+	test-e2e-run
+
+.PHONY: e2e-image
+e2e-image:
+	DOCKER_BUILDKIT=1 docker build --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg goproxy=$(GOPROXY) --build-arg ARCH=$(ARCH) --build-arg package=./controlplane --build-arg ldflags="$(LDFLAGS)" . -t $(CONTROLPLANE_IMG):$(TAG)
+	DOCKER_BUILDKIT=1 docker build --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg goproxy=$(GOPROXY) --build-arg ARCH=$(ARCH) --build-arg package=./bootstrap --build-arg ldflags="$(LDFLAGS)" . -t $(BOOTSTRAP_IMG):$(TAG)
+	
+
 
 ## --------------------------------------
 ## Release
