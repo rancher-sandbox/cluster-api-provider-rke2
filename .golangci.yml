@@ -1,0 +1,13 @@
+# Options for analysis running.
+run:
+  go: "1.19"
+  skip-files:
+    - "zz_generated.*\\.go$"
+    - "vendored_openapi\\.go$"
+  allow-parallel-runners: true
+linters:
+  enable-all: true
+issues:
+  include:
+    - EXC0012
+    - EXC0014
