@@ -36,13 +36,480 @@ spec:
           spec:
             description: RKE2ConfigTemplateSpec defines the desired state of RKE2ConfigTemplate
             properties:
-              foo:
+              template:
                 description: Foo is an example field of RKE2ConfigTemplate. Edit RKE2configtemplate_types.go
                   to remove/update
-                type: string
-            type: object
-          status:
-            description: RKE2ConfigTemplateStatus defines the observed state of RKE2ConfigTemplate
+                properties:
+                  spec:
+                    description: RKE2ConfigSpec defines the desired state of RKE2Config.
+                    properties:
+                      agentConfig:
+                        description: AgentConfig specifies configuration for the agent
+                          nodes.
+                        properties:
+                          airGapped:
+                            description: 'AirGapped is a boolean value to define if
+                              the bootstrapping should be air-gapped, basically supposing
+                              that online container registries and RKE2 install scripts
+                              are not reachable. NOTE: Make sure when using this option
+                              that you are using a custom machine image in the InfraMachineTemplates,
+                              this image needs to contain the necessary RKE2 files
+                              which are: - install.sh - rke2-images.linux-amd64.tar.zst
+                              - rke2.linux-amd64.tar.gz - sha256sum-amd64.txt from
+                              the RKE2 release page, these files should be the same
+                              as the ones from RKE2AgentConfig'
+                            type: boolean
+                          cisProfile:
+                            description: CISProfile activates CIS compliance of RKE2
+                              for a certain profile
+                            enum:
+                            - cis-1.23
+                            type: string
+                          containerRuntimeEndpoint:
+                            description: ContainerRuntimeEndpoint Disable embedded
+                              containerd and use alternative CRI implementation.
+                            type: string
+                          dataDir:
+                            description: DataDir Folder to hold state.
+                            type: string
+                          enableContainerdSElinux:
+                            description: EnableContainerdSElinux defines the policy
+                              for enabling SELinux for Containerd if value is true,
+                              Containerd will run with selinux-enabled=true flag if
+                              value is false, Containerd will run without the above
+                              flag
+                            type: boolean
+                          imageCredentialProviderConfigMap:
+                            description: ImageCredentialProviderConfigMap is a reference
+                              to the ConfigMap that contains credential provider plugin
+                              config The config map should contain a key "credential-config.yaml"
+                              with YAML file content and a key "credential-provider-binaries"
+                              with the a path to the binaries for the credential provider.
+                            properties:
+                              apiVersion:
+                                description: API version of the referent.
+                                type: string
+                              fieldPath:
+                                description: 'If referring to a piece of an object
+                                  instead of an entire object, this string should
+                                  contain a valid JSON/Go field access statement,
+                                  such as desiredState.manifest.containers[2]. For
+                                  example, if the object reference is to a container
+                                  within a pod, this would take on a value like: "spec.containers{name}"
+                                  (where "name" refers to the name of the container
+                                  that triggered the event) or if no container name
+                                  is specified "spec.containers[2]" (container with
+                                  index 2 in this pod). This syntax is chosen only
+                                  to have some well-defined way of referencing a part
+                                  of an object. TODO: this design is not final and
+                                  this field is subject to change in the future.'
+                                type: string
+                              kind:
+                                description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                                type: string
+                              name:
+                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                type: string
+                              namespace:
+                                description: 'Namespace of the referent. More info:
+                                  https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                                type: string
+                              resourceVersion:
+                                description: 'Specific resourceVersion to which this
+                                  reference is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                                type: string
+                              uid:
+                                description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                                type: string
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          kubeProxy:
+                            description: KubeProxyArgs Customized flag for kube-proxy
+                              process.
+                            properties:
+                              extraArgs:
+                                description: ExtraArgs is a map of command line arguments
+                                  to pass to a Kubernetes Component command.
+                                items:
+                                  type: string
+                                type: array
+                              extraEnv:
+                                additionalProperties:
+                                  type: string
+                                description: ExtraEnv is a map of environment variables
+                                  to pass on to a Kubernetes Component command.
+                                type: object
+                              extraMounts:
+                                additionalProperties:
+                                  type: string
+                                description: ExtraMounts is a map of volume mounts
+                                  to be added for the Kubernetes component StaticPod
+                                type: object
+                              overrideImage:
+                                description: OverrideImage is a string that references
+                                  a container image to override the default one for
+                                  the Kubernetes Component
+                                type: string
+                            type: object
+                          kubelet:
+                            description: KubeletArgs Customized flag for kubelet process.
+                            properties:
+                              extraArgs:
+                                description: ExtraArgs is a map of command line arguments
+                                  to pass to a Kubernetes Component command.
+                                items:
+                                  type: string
+                                type: array
+                              extraEnv:
+                                additionalProperties:
+                                  type: string
+                                description: ExtraEnv is a map of environment variables
+                                  to pass on to a Kubernetes Component command.
+                                type: object
+                              extraMounts:
+                                additionalProperties:
+                                  type: string
+                                description: ExtraMounts is a map of volume mounts
+                                  to be added for the Kubernetes component StaticPod
+                                type: object
+                              overrideImage:
+                                description: OverrideImage is a string that references
+                                  a container image to override the default one for
+                                  the Kubernetes Component
+                                type: string
+                            type: object
+                          kubeletPath:
+                            description: KubeletPath Override kubelet binary path.
+                            type: string
+                          loadBalancerPort:
+                            description: 'LoadBalancerPort local port for supervisor
+                              client load-balancer. If the supervisor and apiserver
+                              are not colocated an additional port 1 less than this
+                              port will also be used for the apiserver client load-balancer
+                              (default: 6444).'
+                            type: integer
+                          nodeLabels:
+                            description: NodeLabels  Registering and starting kubelet
+                              with set of labels.
+                            items:
+                              type: string
+                            type: array
+                          nodeName:
+                            description: NodeNamePrefix Prefix to the Node Name that
+                              CAPI will generate.
+                            type: string
+                          nodeTaints:
+                            description: NodeTaints Registering kubelet with set of
+                              taints.
+                            items:
+                              type: string
+                            type: array
+                          ntp:
+                            description: NTP specifies NTP configuration
+                            properties:
+                              enabled:
+                                description: Enabled specifies whether NTP should
+                                  be enabled
+                                type: boolean
+                              servers:
+                                description: Servers specifies which NTP servers to
+                                  use
+                                items:
+                                  type: string
+                                type: array
+                            type: object
+                          protectKernelDefaults:
+                            description: ProtectKernelDefaults defines Kernel tuning
+                              behavior. If true, error if kernel tunables are different
+                              than kubelet defaults. if false, kernel tunable can
+                              be different from kubelet defaults
+                            type: boolean
+                          resolvConf:
+                            description: ResolvConf is a reference to a ConfigMap
+                              containing resolv.conf content for the node.
+                            properties:
+                              apiVersion:
+                                description: API version of the referent.
+                                type: string
+                              fieldPath:
+                                description: 'If referring to a piece of an object
+                                  instead of an entire object, this string should
+                                  contain a valid JSON/Go field access statement,
+                                  such as desiredState.manifest.containers[2]. For
+                                  example, if the object reference is to a container
+                                  within a pod, this would take on a value like: "spec.containers{name}"
+                                  (where "name" refers to the name of the container
+                                  that triggered the event) or if no container name
+                                  is specified "spec.containers[2]" (container with
+                                  index 2 in this pod). This syntax is chosen only
+                                  to have some well-defined way of referencing a part
+                                  of an object. TODO: this design is not final and
+                                  this field is subject to change in the future.'
+                                type: string
+                              kind:
+                                description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                                type: string
+                              name:
+                                description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                type: string
+                              namespace:
+                                description: 'Namespace of the referent. More info:
+                                  https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                                type: string
+                              resourceVersion:
+                                description: 'Specific resourceVersion to which this
+                                  reference is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                                type: string
+                              uid:
+                                description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                                type: string
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          runtimeImage:
+                            description: RuntimeImage override image to use for runtime
+                              binaries (containerd, kubectl, crictl, etc).
+                            type: string
+                          snapshotter:
+                            description: 'Snapshotter override default containerd
+                              snapshotter (default: "overlayfs").'
+                            type: string
+                          systemDefaultRegistry:
+                            description: SystemDefaultRegistry Private registry to
+                              be used for all system images.
+                            type: string
+                          version:
+                            description: Version specifies the rke2 version.
+                            type: string
+                        type: object
+                      files:
+                        description: Files specifies extra files to be passed to user_data
+                          upon creation.
+                        items:
+                          description: File defines the input for generating write_files
+                            in cloud-init.
+                          properties:
+                            content:
+                              description: Content is the actual content of the file.
+                              type: string
+                            contentFrom:
+                              description: ContentFrom is a referenced source of content
+                                to populate the file.
+                              properties:
+                                secret:
+                                  description: Secret represents a secret that should
+                                    populate this file.
+                                  properties:
+                                    key:
+                                      description: Key is the key in the secret's
+                                        data map for this value.
+                                      type: string
+                                    name:
+                                      description: Name of the secret in the RKE2BootstrapConfig's
+                                        namespace to use.
+                                      type: string
+                                  required:
+                                  - key
+                                  - name
+                                  type: object
+                              required:
+                              - secret
+                              type: object
+                            encoding:
+                              description: Encoding specifies the encoding of the
+                                file contents.
+                              enum:
+                              - base64
+                              - gzip
+                              - gzip+base64
+                              type: string
+                            owner:
+                              description: Owner specifies the ownership of the file,
+                                e.g. "root:root".
+                              type: string
+                            path:
+                              description: Path specifies the full path on disk where
+                                to store the file.
+                              type: string
+                            permissions:
+                              description: Permissions specifies the permissions to
+                                assign to the file, e.g. "0640".
+                              type: string
+                          required:
+                          - path
+                          type: object
+                        type: array
+                      postRKE2Commands:
+                        description: PostRKE2Commands specifies extra commands to
+                          run after rke2 setup runs.
+                        items:
+                          type: string
+                        type: array
+                      preRKE2Commands:
+                        description: PreRKE2Commands specifies extra commands to run
+                          before rke2 setup runs.
+                        items:
+                          type: string
+                        type: array
+                      privateRegistriesConfig:
+                        description: PrivateRegistriesConfig defines the containerd
+                          configuration for private registries and local registry
+                          mirrors.
+                        properties:
+                          configs:
+                            additionalProperties:
+                              description: RegistryConfig contains configuration used
+                                to communicate with the registry.
+                              properties:
+                                authSecret:
+                                  description: Auth si a reference to a Secret containing
+                                    information to authenticate to the registry. The
+                                    Secret must provite a username and a password
+                                    data entry.
+                                  properties:
+                                    apiVersion:
+                                      description: API version of the referent.
+                                      type: string
+                                    fieldPath:
+                                      description: 'If referring to a piece of an
+                                        object instead of an entire object, this string
+                                        should contain a valid JSON/Go field access
+                                        statement, such as desiredState.manifest.containers[2].
+                                        For example, if the object reference is to
+                                        a container within a pod, this would take
+                                        on a value like: "spec.containers{name}" (where
+                                        "name" refers to the name of the container
+                                        that triggered the event) or if no container
+                                        name is specified "spec.containers[2]" (container
+                                        with index 2 in this pod). This syntax is
+                                        chosen only to have some well-defined way
+                                        of referencing a part of an object. TODO:
+                                        this design is not final and this field is
+                                        subject to change in the future.'
+                                      type: string
+                                    kind:
+                                      description: 'Kind of the referent. More info:
+                                        https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                                      type: string
+                                    name:
+                                      description: 'Name of the referent. More info:
+                                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                      type: string
+                                    namespace:
+                                      description: 'Namespace of the referent. More
+                                        info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                                      type: string
+                                    resourceVersion:
+                                      description: 'Specific resourceVersion to which
+                                        this reference is made, if any. More info:
+                                        https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                                      type: string
+                                    uid:
+                                      description: 'UID of the referent. More info:
+                                        https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                                      type: string
+                                  type: object
+                                  x-kubernetes-map-type: atomic
+                                tls:
+                                  description: TLS is a pair of CA/Cert/Key which
+                                    then are used when creating the transport that
+                                    communicates with the registry.
+                                  properties:
+                                    enforceSslVerify:
+                                      description: EnforceSSLVerify may be set to
+                                        false to skip verifying the registry's certificate,
+                                        default is true.
+                                      type: boolean
+                                    tlsConfigSecret:
+                                      description: 'TLSConfigSecret is a reference
+                                        to a secret of type `kubernetes.io/tls` thich
+                                        has up to 3 entries: tls.crt, tls.key and
+                                        ca.crt which describe the TLS configuration
+                                        necessary to connect to the registry.'
+                                      properties:
+                                        apiVersion:
+                                          description: API version of the referent.
+                                          type: string
+                                        fieldPath:
+                                          description: 'If referring to a piece of
+                                            an object instead of an entire object,
+                                            this string should contain a valid JSON/Go
+                                            field access statement, such as desiredState.manifest.containers[2].
+                                            For example, if the object reference is
+                                            to a container within a pod, this would
+                                            take on a value like: "spec.containers{name}"
+                                            (where "name" refers to the name of the
+                                            container that triggered the event) or
+                                            if no container name is specified "spec.containers[2]"
+                                            (container with index 2 in this pod).
+                                            This syntax is chosen only to have some
+                                            well-defined way of referencing a part
+                                            of an object. TODO: this design is not
+                                            final and this field is subject to change
+                                            in the future.'
+                                          type: string
+                                        kind:
+                                          description: 'Kind of the referent. More
+                                            info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                                          type: string
+                                        name:
+                                          description: 'Name of the referent. More
+                                            info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                          type: string
+                                        namespace:
+                                          description: 'Namespace of the referent.
+                                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                                          type: string
+                                        resourceVersion:
+                                          description: 'Specific resourceVersion to
+                                            which this reference is made, if any.
+                                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                                          type: string
+                                        uid:
+                                          description: 'UID of the referent. More
+                                            info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                                          type: string
+                                      type: object
+                                      x-kubernetes-map-type: atomic
+                                  type: object
+                              type: object
+                            description: Configs are configs for each registry. The
+                              key is the FDQN or IP of the registry.
+                            type: object
+                          mirrors:
+                            additionalProperties:
+                              description: Mirror contains the config related to the
+                                registry mirror.
+                              properties:
+                                endpoint:
+                                  description: Endpoints are endpoints for a namespace.
+                                    CRI plugin will try the endpoints one by one until
+                                    a working one is found. The endpoint must be a
+                                    valid url with host specified. The scheme, host
+                                    and path from the endpoint URL will be used.
+                                  items:
+                                    type: string
+                                  type: array
+                                rewrite:
+                                  additionalProperties:
+                                    type: string
+                                  description: Rewrites are repository rewrite rules
+                                    for a namespace. When fetching image resources
+                                    from an endpoint and a key matches the repository
+                                    via regular expression matching it will be replaced
+                                    with the corresponding value from the map in the
+                                    resource request.
+                                  type: object
+                              type: object
+                            description: Mirrors are namespace to mirror mapping for
+                              all namespaces.
+                            type: object
+                        type: object
+                    type: object
+                required:
+                - spec
+                type: object
+            required:
+            - template
             type: object
         type: object
     served: true

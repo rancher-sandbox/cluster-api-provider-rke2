@@ -29,10 +29,20 @@ const (
 )
 
 const (
+	// DataSecretGenerationFailedReason (Severity=Warning) documents a RKE2Config controller detecting
+	// an error while generating a data secret; those kind of errors are usually due to misconfigurations
+	// and user intervention is required to get them fixed.
+	DataSecretGenerationFailedReason string = "DataSecretGenerationFailed"
+
 	// WaitingForClusterInfrastructureReason (Severity=Info) document a bootstrap secret generation process
 	// waiting for the cluster infrastructure to be ready.
 	//
 	// NOTE: Having the cluster infrastructure ready is a pre-condition for starting to create machines;
-
 	WaitingForClusterInfrastructureReason string = "WaitingForClusterInfrastructure"
+)
+
+const (
+	CertificatesAvailableCondition clusterv1.ConditionType = "CertificatesAvailable"
+
+	CertificatesGenerationFailedReason string = "CertificateGenerationFailed"
 )

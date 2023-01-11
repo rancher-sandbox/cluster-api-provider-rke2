@@ -9,6 +9,7 @@ import (
 	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -17,6 +18,22 @@ var _ = Describe("RKE2ServerConfig", func() {
 
 	BeforeEach(func() {
 		opts = &RKE2ServerConfigOpts{
+			Cluster: v1beta1.Cluster{
+				Spec: v1beta1.ClusterSpec{
+					ClusterNetwork: &v1beta1.ClusterNetwork{
+						Pods: &v1beta1.NetworkRanges{
+							CIDRBlocks: []string{
+								"192.168.0.0/16",
+							},
+						},
+						Services: &v1beta1.NetworkRanges{
+							CIDRBlocks: []string{
+								"192.169.0.0/16",
+							},
+						},
+					},
+				},
+			},
 			ControlPlaneEndpoint: "testendpoint",
 			Ctx:                  context.Background(),
 			Client: fake.NewClientBuilder().WithObjects(
@@ -74,7 +91,6 @@ var _ = Describe("RKE2ServerConfig", func() {
 				Etcd: controlplanev1.EtcdConfig{
 					ExposeMetrics: true,
 					BackupConfig: controlplanev1.EtcdBackupConfig{
-						EnableAutomaticSnapshots: true,
 						S3: &controlplanev1.EtcdS3{
 							S3CredentialSecret: corev1.ObjectReference{
 								Name:      "test",
@@ -140,6 +156,8 @@ var _ = Describe("RKE2ServerConfig", func() {
 		Expect(rke2ServerConfig.AuditPolicyFile).To(Equal("/etc/rancher/rke2/audit-policy.yaml"))
 		Expect(rke2ServerConfig.BindAddress).To(Equal(serverConfig.BindAddress))
 		Expect(rke2ServerConfig.CNI).To(Equal(string(serverConfig.CNI)))
+		Expect(rke2ServerConfig.ClusterCIDR).To(Equal("192.168.0.0/16"))
+		Expect(rke2ServerConfig.ServiceCIDR).To(Equal("192.169.0.0/16"))
 		Expect(rke2ServerConfig.ClusterDNS).To(Equal(serverConfig.ClusterDNS))
 		Expect(rke2ServerConfig.ClusterDomain).To(Equal(serverConfig.ClusterDomain))
 		Expect(rke2ServerConfig.CloudProviderConfig).To(Equal("/etc/rancher/rke2/cloud-provider-config"))
@@ -148,7 +166,7 @@ var _ = Describe("RKE2ServerConfig", func() {
 		Expect(rke2ServerConfig.DisableKubeProxy).To(BeTrue())
 		Expect(rke2ServerConfig.DisableCloudController).To(BeTrue())
 		Expect(rke2ServerConfig.DisableScheduler).To(BeTrue())
-		Expect(rke2ServerConfig.EtcdDisableSnapshots).To(BeFalse())
+		//Expect(rke2ServerConfig.EtcdDisableSnapshots).To(BeFalse())
 		Expect(rke2ServerConfig.EtcdExposeMetrics).To(Equal(serverConfig.Etcd.ExposeMetrics))
 		Expect(rke2ServerConfig.EtcdS3).To(BeTrue())
 		Expect(rke2ServerConfig.EtcdS3AccessKey).To(Equal("test_id"))

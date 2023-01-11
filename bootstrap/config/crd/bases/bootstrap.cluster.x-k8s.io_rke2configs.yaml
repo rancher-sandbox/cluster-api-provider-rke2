@@ -38,6 +38,17 @@ spec:
               agentConfig:
                 description: AgentConfig specifies configuration for the agent nodes.
                 properties:
+                  airGapped:
+                    description: 'AirGapped is a boolean value to define if the bootstrapping
+                      should be air-gapped, basically supposing that online container
+                      registries and RKE2 install scripts are not reachable. NOTE:
+                      Make sure when using this option that you are using a custom
+                      machine image in the InfraMachineTemplates, this image needs
+                      to contain the necessary RKE2 files which are: - install.sh
+                      - rke2-images.linux-amd64.tar.zst - rke2.linux-amd64.tar.gz
+                      - sha256sum-amd64.txt from the RKE2 release page, these files
+                      should be the same as the ones from RKE2AgentConfig'
+                    type: boolean
                   cisProfile:
                     description: CISProfile activates CIS compliance of RKE2 for a
                       certain profile

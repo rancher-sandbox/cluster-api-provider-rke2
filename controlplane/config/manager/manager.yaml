@@ -22,7 +22,7 @@ spec:
         - /manager
         args:
         - "--leader-elect"
-        - "--metrics-bind-address=localhost:8080"
+        - "--metrics-bind-addr=localhost:8080"
         image: controller:latest
         name: manager
         env:

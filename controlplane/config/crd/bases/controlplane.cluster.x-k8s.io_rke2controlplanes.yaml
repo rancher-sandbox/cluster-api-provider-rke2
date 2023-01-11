@@ -35,6 +35,16 @@ spec:
           spec:
             description: RKE2ControlPlaneSpec defines the desired state of RKE2ControlPlane
             properties:
+              airGapped:
+                description: 'AirGapped is a boolean value to define if the bootstrapping
+                  should be air-gapped, basically supposing that online container
+                  registries and RKE2 install scripts are not reachable. NOTE: Make
+                  sure when using this option that you are using a custom machine
+                  image in the InfraMachineTemplates, this image needs to contain
+                  the necessary RKE2 files which are: - install.sh - rke2-images.linux-amd64.tar.zst
+                  - rke2.linux-amd64.tar.gz - sha256sum-amd64.txt from the RKE2 release
+                  page, these files should be the same as the ones from RKE2AgentConfig'
+                type: boolean
               cisProfile:
                 description: CISProfile activates CIS compliance of RKE2 for a certain
                   profile
@@ -496,8 +506,8 @@ spec:
                           directory:
                             description: Directory Directory to save db snapshots.
                             type: string
-                          enableAutomaticSnapshots:
-                            description: EnableAutomaticSnapshots defines the policy
+                          disableAutomaticSnapshots:
+                            description: DisableAutomaticSnapshots defines the policy
                               for ETCD snapshots. true means automatic snapshots will
                               be scheduled, false means automatic snapshots will not
                               be scheduled.
@@ -853,6 +863,28 @@ spec:
                 description: Ready indicates the BootstrapData field is ready to be
                   consumed.
                 type: boolean
+              readyReplicas:
+                description: ReadyReplicas is the number of replicas current attached
+                  to this ControlPlane Resource and that have Ready Status
+                format: int32
+                type: integer
+              replicas:
+                description: Replicas is the number of replicas current attached to
+                  this ControlPlane Resource
+                format: int32
+                type: integer
+              unavailableReplicas:
+                description: UnavailableReplicas is the number of replicas current
+                  attached to this ControlPlane Resource and that are up-to-date with
+                  Control Plane config
+                format: int32
+                type: integer
+              updatedReplicas:
+                description: UpdatedReplicas is the number of replicas current attached
+                  to this ControlPlane Resource and that are up-to-date with Control
+                  Plane config
+                format: int32
+                type: integer
             type: object
         type: object
     served: true

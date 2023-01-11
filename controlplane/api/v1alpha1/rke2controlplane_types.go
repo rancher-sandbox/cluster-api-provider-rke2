@@ -26,8 +26,8 @@ import (
 const (
 	RKE2ControlPlaneFinalizer = "rke2.controleplane.cluster.x-k8s.io"
 
-	// RKE2ServerConfigurationAnnotation is a machine annotation that stores the json-marshalled string of KCP ClusterConfiguration.
-	// This annotation is used to detect any changes in ClusterConfiguration and trigger machine rollout in KCP.
+	// RKE2ServerConfigurationAnnotation is a machine annotation that stores the json-marshalled string of RKE2Config
+	// This annotation is used to detect any changes in RKE2Config and trigger machine rollout.
 	RKE2ServerConfigurationAnnotation = "controlplane.cluster.x-k8s.io/rke2-server-configuration"
 )
 
@@ -157,6 +157,18 @@ type RKE2ControlPlaneStatus struct {
 	// Conditions defines current service state of the RKE2Config.
 	// +optional
 	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
+
+	// Replicas is the number of replicas current attached to this ControlPlane Resource
+	Replicas int32 `json:"replicas,omitempty"`
+
+	// ReadyReplicas is the number of replicas current attached to this ControlPlane Resource and that have Ready Status
+	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
+
+	// UpdatedReplicas is the number of replicas current attached to this ControlPlane Resource and that are up-to-date with Control Plane config
+	UpdatedReplicas int32 `json:"updatedReplicas,omitempty"`
+
+	// UnavailableReplicas is the number of replicas current attached to this ControlPlane Resource and that are up-to-date with Control Plane config
+	UnavailableReplicas int32 `json:"unavailableReplicas,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -198,9 +210,9 @@ type EtcdConfig struct {
 
 // EtcdBackupConfig describes the backup configuration for ETCD.
 type EtcdBackupConfig struct {
-	// EnableAutomaticSnapshots defines the policy for ETCD snapshots. true means automatic snapshots will be scheduled, false means automatic snapshots will not be scheduled.
+	// DisableAutomaticSnapshots defines the policy for ETCD snapshots. true means automatic snapshots will be scheduled, false means automatic snapshots will not be scheduled.
 	//+optional
-	EnableAutomaticSnapshots bool `json:"enableAutomaticSnapshots,omitempty"`
+	DisableAutomaticSnapshots *bool `json:"disableAutomaticSnapshots,omitempty"`
 
 	// SnapshotName Set the base name of etcd snapshots. Default: etcd-snapshot-<unix-timestamp> (default: "etcd-snapshot").
 	//+optional

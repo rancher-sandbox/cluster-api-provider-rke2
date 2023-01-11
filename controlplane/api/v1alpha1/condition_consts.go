@@ -95,3 +95,9 @@ const (
 	// ScalingDownReason (Severity=Info) documents a RKE2ControlPlane that is decreasing the number of replicas.
 	ScalingDownReason = "ScalingDown"
 )
+
+const (
+	CertificatesAvailableCondition clusterv1.ConditionType = "CertificatesAvailable"
+
+	CertificatesGenerationFailedReason string = "CertificateGenerationFailed"
+)

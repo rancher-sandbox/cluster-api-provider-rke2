@@ -171,7 +171,7 @@ func setupChecks(mgr ctrl.Manager) {
 }
 
 func setupReconcilers(mgr ctrl.Manager) {
-	if err := (&controllers.Rke2ConfigReconciler{
+	if err := (&controllers.RKE2ConfigReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {

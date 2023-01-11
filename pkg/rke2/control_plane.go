@@ -27,21 +27,20 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/klog/v2/klogr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-
-	bootstrapv1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1alpha1"
-
-	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1alpha1"
 	"sigs.k8s.io/cluster-api/controllers/external"
-
 	"sigs.k8s.io/cluster-api/util/collections"
 	"sigs.k8s.io/cluster-api/util/patch"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	bootstrapv1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1alpha1"
+	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1alpha1"
 )
 
 // ControlPlane holds business logic around control planes.
 // It should never need to connect to a service, that responsibility lies outside of this struct.
-// Going forward we should be trying to add more logic to here and reduce the amount of logic in the reconciler.
 type ControlPlane struct {
 	RCP                  *controlplanev1.RKE2ControlPlane
 	Cluster              *clusterv1.Cluster
@@ -51,14 +50,12 @@ type ControlPlane struct {
 	// reconciliationTime is the time of the current reconciliation, and should be used for all "now" calculations
 	reconciliationTime metav1.Time
 
-	// TODO: we should see if we can combine these with the Machine objects so we don't have all these separate lookups
-	// See discussion on https://github.com/kubernetes-sigs/cluster-api/pull/3405
 	rke2Configs    map[string]*bootstrapv1.RKE2Config
 	infraResources map[string]*unstructured.Unstructured
 }
 
 // NewControlPlane returns an instantiated ControlPlane.
-func NewControlPlane(ctx context.Context, client client.Client, cluster *clusterv1.Cluster, kcp *controlplanev1.RKE2ControlPlane, ownedMachines collections.Machines) (*ControlPlane, error) {
+func NewControlPlane(ctx context.Context, client client.Client, cluster *clusterv1.Cluster, rcp *controlplanev1.RKE2ControlPlane, ownedMachines collections.Machines) (*ControlPlane, error) {
 	infraObjects, err := getInfraResources(ctx, client, ownedMachines)
 	if err != nil {
 		return nil, err
@@ -77,7 +74,7 @@ func NewControlPlane(ctx context.Context, client client.Client, cluster *cluster
 	}
 
 	return &ControlPlane{
-		RCP:                  kcp,
+		RCP:                  rcp,
 		Cluster:              cluster,
 		Machines:             ownedMachines,
 		machinesPatchHelpers: patchHelpers,
@@ -89,15 +86,7 @@ func NewControlPlane(ctx context.Context, client client.Client, cluster *cluster
 
 // Logger returns a logger with useful context.
 func (c *ControlPlane) Logger() logr.Logger {
-	return Log.WithValues("namespace", c.RCP.Namespace, "name", c.RCP.Name, "cluster-name", c.Cluster.Name)
-}
-
-// FailureDomains returns a slice of failure domain objects synced from the infrastructure provider into Cluster.Status.
-func (c *ControlPlane) FailureDomains() clusterv1.FailureDomains {
-	if c.Cluster.Status.FailureDomains == nil {
-		return clusterv1.FailureDomains{}
-	}
-	return c.Cluster.Status.FailureDomains
+	return klogr.New().WithValues("namespace", c.RCP.Namespace, "name", c.RCP.Name, "cluster-name", c.Cluster.Name)
 }
 
 // Version returns the RKE2ControlPlane's version.
@@ -120,52 +109,12 @@ func (c *ControlPlane) AsOwnerReference() *metav1.OwnerReference {
 	}
 }
 
-// EtcdImageData returns the etcd image data embedded in the ClusterConfiguration or empty strings if none are defined.
-func (c *ControlPlane) EtcdImageData() (string, string) {
-	return "", ""
-}
-
-// MachineInFailureDomainWithMostMachines returns the first matching failure domain with machines that has the most control-plane machines on it.
-func (c *ControlPlane) MachineInFailureDomainWithMostMachines(machines collections.Machines) (*clusterv1.Machine, error) {
-	fd := c.FailureDomainWithMostMachines(machines)
-	machinesInFailureDomain := machines.Filter(collections.InFailureDomains(fd))
-	machineToMark := machinesInFailureDomain.Oldest()
-	if machineToMark == nil {
-		return nil, errors.New("failed to pick control plane Machine to mark for deletion")
-	}
-	return machineToMark, nil
-}
-
 // MachineWithDeleteAnnotation returns a machine that has been annotated with DeleteMachineAnnotation key.
 func (c *ControlPlane) MachineWithDeleteAnnotation(machines collections.Machines) collections.Machines {
 	// See if there are any machines with DeleteMachineAnnotation key.
-	//annotatedMachines := machines.Filter(machinefilters.HasAnnotationKey(clusterv1.DeleteMachineAnnotation))
+	annotatedMachines := machines.Filter(collections.HasAnnotationKey(clusterv1.DeleteMachineAnnotation))
 	// If there are, return list of annotated machines.
-	return nil
-}
-
-// FailureDomainWithMostMachines returns a fd which exists both in machines and control-plane machines and has the most
-// control-plane machines on it.
-func (c *ControlPlane) FailureDomainWithMostMachines(machines collections.Machines) *string {
-	// See if there are any Machines that are not in currently defined failure domains first.
-	notInFailureDomains := machines.Filter(
-		collections.Not(collections.InFailureDomains(c.FailureDomains().FilterControlPlane().GetIDs()...)),
-	)
-	if len(notInFailureDomains) > 0 {
-		// return the failure domain for the oldest Machine not in the current list of failure domains
-		// this could be either nil (no failure domain defined) or a failure domain that is no longer defined
-		// in the cluster status.
-		return notInFailureDomains.Oldest().Spec.FailureDomain
-	}
-	return PickMost(c, machines)
-}
-
-// NextFailureDomainForScaleUp returns the failure domain with the fewest number of up-to-date machines.
-func (c *ControlPlane) NextFailureDomainForScaleUp() *string {
-	if len(c.Cluster.Status.FailureDomains.FilterControlPlane()) == 0 {
-		return nil
-	}
-	return PickFewest(c.FailureDomains().FilterControlPlane(), c.UpToDateMachines())
+	return annotatedMachines
 }
 
 // InitialControlPlaneConfig returns a new RKE2ConfigSpec that is to be used for an initializing control plane.
@@ -192,10 +141,12 @@ func (c *ControlPlane) GenerateRKE2Config(spec *bootstrapv1.RKE2ConfigSpec) *boo
 
 	bootstrapConfig := &bootstrapv1.RKE2Config{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            names.SimpleNameGenerator.GenerateName(c.RCP.Name + "-"),
-			Namespace:       c.RCP.Namespace,
-			Labels:          ControlPlaneLabelsForCluster(c.Cluster.Name),
-			OwnerReferences: []metav1.OwnerReference{owner},
+			Name:      names.SimpleNameGenerator.GenerateName(c.RCP.Name + "-"),
+			Namespace: c.RCP.Namespace,
+			Labels:    ControlPlaneLabelsForCluster(c.Cluster.Name),
+			OwnerReferences: []metav1.OwnerReference{
+				owner,
+			},
 		},
 		Spec: *spec,
 	}

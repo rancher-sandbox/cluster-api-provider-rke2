@@ -64,7 +64,6 @@ var (
 )
 
 func init() {
-	klog.InitFlags(nil)
 
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
@@ -113,6 +112,7 @@ func InitFlags(fs *pflag.FlagSet) {
 }
 
 func main() {
+	klog.InitFlags(nil)
 	InitFlags(pflag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()

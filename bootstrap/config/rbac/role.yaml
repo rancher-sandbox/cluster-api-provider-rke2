@@ -47,3 +47,12 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - controlplane.cluster.x-k8s.io
+  resources:
+  - rke2controlplanes
+  - rke2controlplanes/status
+  verbs:
+  - get
+  - list
+  - watch

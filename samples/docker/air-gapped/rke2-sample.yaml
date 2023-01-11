@@ -37,6 +37,12 @@ metadata:
 spec: 
   replicas: ${CABPR_CP_REPLICAS}
   version: ${KUBERNETES_VERSION}+rke2r1
+  airGapped: true
+  serverConfig:
+    cni: cilium
+  kubeProxy:
+    extraEnv:
+      hello: world
   infrastructureRef:
     apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
     kind: DockerMachineTemplate
@@ -50,7 +56,8 @@ metadata:
   namespace: ${CABPR_NAMESPACE}
 spec:
   template:
-    spec: {} 
+    spec: 
+      customImage: rke2-ubuntu:${KUBERNETES_VERSION}-rke2r1
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachineDeployment
@@ -86,7 +93,8 @@ metadata:
   namespace: ${CABPR_NAMESPACE}
 spec:
   template:
-    spec: {} 
+    spec: 
+      customImage: rke2-ubuntu:${KUBERNETES_VERSION}-rke2r1
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1alpha1
 kind: RKE2ConfigTemplate
@@ -98,3 +106,7 @@ spec:
     spec:
       agentConfig:
         version: ${KUBERNETES_VERSION}+rke2r1
+        airGapped: true
+        kubeProxy:
+          extraEnv:
+            hello: world

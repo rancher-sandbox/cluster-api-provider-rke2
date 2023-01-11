@@ -156,7 +156,7 @@ func (w *Workload) UpdateAgentConditions(ctx context.Context, controlPlane *Cont
 	}
 
 	// Update conditions for control plane components hosted as static pods on the nodes.
-	var kcpErrors []string
+	var rcpErrors []string
 
 	for _, node := range controlPlaneNodes.Items {
 		// Search for the machine corresponding to the node.
@@ -175,7 +175,7 @@ func (w *Workload) UpdateAgentConditions(ctx context.Context, controlPlane *Cont
 			if hasProvisioningMachine(controlPlane.Machines) {
 				continue
 			}
-			kcpErrors = append(kcpErrors, fmt.Sprintf("Control plane node %s does not have a corresponding machine", node.Name))
+			rcpErrors = append(rcpErrors, fmt.Sprintf("Control plane node %s does not have a corresponding machine", node.Name))
 			continue
 		}
 
@@ -246,7 +246,7 @@ func (w *Workload) UpdateAgentConditions(ctx context.Context, controlPlane *Cont
 	aggregateFromMachinesToRCP(aggregateFromMachinesToRCPInput{
 		controlPlane:      controlPlane,
 		machineConditions: allMachinePodConditions,
-		kcpErrors:         kcpErrors,
+		rcpErrors:         rcpErrors,
 		condition:         controlplanev1.ControlPlaneComponentsHealthyCondition,
 		unhealthyReason:   controlplanev1.ControlPlaneComponentsUnhealthyReason,
 		unknownReason:     controlplanev1.ControlPlaneComponentsUnknownReason,
@@ -265,7 +265,7 @@ func (w *Workload) UpdateAgentConditions(ctx context.Context, controlPlane *Cont
 type aggregateFromMachinesToRCPInput struct {
 	controlPlane      *ControlPlane
 	machineConditions []clusterv1.ConditionType
-	kcpErrors         []string
+	rcpErrors         []string
 	condition         clusterv1.ConditionType
 	unhealthyReason   string
 	unknownReason     string
@@ -278,11 +278,11 @@ type aggregateFromMachinesToRCPInput struct {
 func aggregateFromMachinesToRCP(input aggregateFromMachinesToRCPInput) {
 	// Aggregates machines for condition status.
 	// NB. A machine could be assigned to many groups, but only the group with the highest severity will be reported.
-	kcpMachinesWithErrors := sets.NewString()
-	kcpMachinesWithWarnings := sets.NewString()
-	kcpMachinesWithInfo := sets.NewString()
-	kcpMachinesWithTrue := sets.NewString()
-	kcpMachinesWithUnknown := sets.NewString()
+	rcpMachinesWithErrors := sets.NewString()
+	rcpMachinesWithWarnings := sets.NewString()
+	rcpMachinesWithInfo := sets.NewString()
+	rcpMachinesWithTrue := sets.NewString()
+	rcpMachinesWithUnknown := sets.NewString()
 
 	for i := range input.controlPlane.Machines {
 		machine := input.controlPlane.Machines[i]
@@ -290,53 +290,53 @@ func aggregateFromMachinesToRCP(input aggregateFromMachinesToRCPInput) {
 			if machineCondition := conditions.Get(machine, condition); machineCondition != nil {
 				switch machineCondition.Status {
 				case corev1.ConditionTrue:
-					kcpMachinesWithTrue.Insert(machine.Name)
+					rcpMachinesWithTrue.Insert(machine.Name)
 				case corev1.ConditionFalse:
 					switch machineCondition.Severity {
 					case clusterv1.ConditionSeverityInfo:
-						kcpMachinesWithInfo.Insert(machine.Name)
+						rcpMachinesWithInfo.Insert(machine.Name)
 					case clusterv1.ConditionSeverityWarning:
-						kcpMachinesWithWarnings.Insert(machine.Name)
+						rcpMachinesWithWarnings.Insert(machine.Name)
 					case clusterv1.ConditionSeverityError:
-						kcpMachinesWithErrors.Insert(machine.Name)
+						rcpMachinesWithErrors.Insert(machine.Name)
 					}
 				case corev1.ConditionUnknown:
-					kcpMachinesWithUnknown.Insert(machine.Name)
+					rcpMachinesWithUnknown.Insert(machine.Name)
 				}
 			}
 		}
 	}
 
 	// In case of at least one machine with errors or RCP level errors (nodes without machines), report false, error.
-	if len(kcpMachinesWithErrors) > 0 {
-		input.kcpErrors = append(input.kcpErrors, fmt.Sprintf("Following machines are reporting %s errors: %s", input.note, strings.Join(kcpMachinesWithErrors.List(), ", ")))
+	if len(rcpMachinesWithErrors) > 0 {
+		input.rcpErrors = append(input.rcpErrors, fmt.Sprintf("Following machines are reporting %s errors: %s", input.note, strings.Join(rcpMachinesWithErrors.List(), ", ")))
 	}
-	if len(input.kcpErrors) > 0 {
-		conditions.MarkFalse(input.controlPlane.RCP, input.condition, input.unhealthyReason, clusterv1.ConditionSeverityError, strings.Join(input.kcpErrors, "; "))
+	if len(input.rcpErrors) > 0 {
+		conditions.MarkFalse(input.controlPlane.RCP, input.condition, input.unhealthyReason, clusterv1.ConditionSeverityError, strings.Join(input.rcpErrors, "; "))
 		return
 	}
 
 	// In case of no errors and at least one machine with warnings, report false, warnings.
-	if len(kcpMachinesWithWarnings) > 0 {
-		conditions.MarkFalse(input.controlPlane.RCP, input.condition, input.unhealthyReason, clusterv1.ConditionSeverityWarning, "Following machines are reporting %s warnings: %s", input.note, strings.Join(kcpMachinesWithWarnings.List(), ", "))
+	if len(rcpMachinesWithWarnings) > 0 {
+		conditions.MarkFalse(input.controlPlane.RCP, input.condition, input.unhealthyReason, clusterv1.ConditionSeverityWarning, "Following machines are reporting %s warnings: %s", input.note, strings.Join(rcpMachinesWithWarnings.List(), ", "))
 		return
 	}
 
 	// In case of no errors, no warning, and at least one machine with info, report false, info.
-	if len(kcpMachinesWithWarnings) > 0 {
-		conditions.MarkFalse(input.controlPlane.RCP, input.condition, input.unhealthyReason, clusterv1.ConditionSeverityWarning, "Following machines are reporting %s info: %s", input.note, strings.Join(kcpMachinesWithInfo.List(), ", "))
+	if len(rcpMachinesWithWarnings) > 0 {
+		conditions.MarkFalse(input.controlPlane.RCP, input.condition, input.unhealthyReason, clusterv1.ConditionSeverityWarning, "Following machines are reporting %s info: %s", input.note, strings.Join(rcpMachinesWithInfo.List(), ", "))
 		return
 	}
 
 	// In case of no errors, no warning, no Info, and at least one machine with true conditions, report true.
-	if len(kcpMachinesWithTrue) > 0 {
+	if len(rcpMachinesWithTrue) > 0 {
 		conditions.MarkTrue(input.controlPlane.RCP, input.condition)
 		return
 	}
 
 	// Otherwise, if there is at least one machine with unknown, report unknown.
-	if len(kcpMachinesWithUnknown) > 0 {
-		conditions.MarkUnknown(input.controlPlane.RCP, input.condition, input.unknownReason, "Following machines are reporting unknown %s status: %s", input.note, strings.Join(kcpMachinesWithUnknown.List(), ", "))
+	if len(rcpMachinesWithUnknown) > 0 {
+		conditions.MarkUnknown(input.controlPlane.RCP, input.condition, input.unknownReason, "Following machines are reporting unknown %s status: %s", input.note, strings.Join(rcpMachinesWithUnknown.List(), ", "))
 		return
 	}
 

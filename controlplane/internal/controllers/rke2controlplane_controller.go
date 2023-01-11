@@ -24,8 +24,9 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1alpha1"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/rke2"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -43,6 +44,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/kubeconfig"
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/rke2"
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/secret"
+)
+
+const (
+	// dependentCertRequeueAfter is how long to wait before checking again to see if
+	// dependent certificates have been created.
+	dependentCertRequeueAfter = 30 * time.Second
 )
 
 // RKE2ControlPlaneReconciler reconciles a RKE2ControlPlane object
@@ -127,9 +138,14 @@ func (r *RKE2ControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	defer func() {
 		// Always attempt to update status.
-		if err := r.updateStatus(ctx, patchHelper, rcp); err != nil {
-			logger.Error(err, "Failed to update RKE2ControlPlane Status")
-			reterr = kerrors.NewAggregate([]error{reterr, err})
+		if err := r.updateStatus(ctx, rcp, cluster); err != nil {
+			var connFailure *rke2.RemoteClusterConnectionError
+			if errors.As(err, &connFailure) {
+				logger.Info("Could not connect to workload cluster to fetch status", "err", err.Error())
+			} else {
+				logger.Error(err, "Failed to update RKE2ControlPlane Status")
+				reterr = kerrors.NewAggregate([]error{reterr, err})
+			}
 		}
 
 		// Always attempt to Patch the RKE2ControlPlane object and status after each reconciliation.
@@ -151,23 +167,11 @@ func (r *RKE2ControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if !rcp.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Handle deletion reconciliation loop.
 		res, err = r.reconcileDelete(ctx, cluster, rcp)
-		// Requeue if the reconcile failed because the ClusterCacheTracker was locked for
-		// the current cluster because of concurrent access.
-		//if errors.Is(err, remote.ErrClusterLocked) {
-		//logger.V(5).Info("Requeueing because another worker has the lock on the ClusterCacheTracker")
-		//return ctrl.Result{Requeue: true}, nil
-		//}
 		return res, err
 	}
 
 	// Handle normal reconciliation loop.
 	res, err = r.reconcileNormal(ctx, cluster, rcp)
-	// Requeue if the reconcile failed because the ClusterCacheTracker was locked for
-	// the current cluster because of concurrent access.
-	//if errors.Is(err, remote.ErrClusterLocked) {
-	//	logger.V(5).Info("Requeueing because another worker has the lock on the ClusterCacheTracker")
-	//	return ctrl.Result{Requeue: true}, nil
-	//}
 	return res, err
 }
 
@@ -231,7 +235,85 @@ func (r *RKE2ControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return nil
 }
 
-func (r *RKE2ControlPlaneReconciler) updateStatus(ctx context.Context, patchHelper *patch.Helper, rcp *controlplanev1.RKE2ControlPlane) error {
+func (r *RKE2ControlPlaneReconciler) updateStatus(ctx context.Context, rcp *controlplanev1.RKE2ControlPlane, cluster *clusterv1.Cluster) error {
+
+	logger := log.FromContext(ctx)
+	ownedMachines, err := r.managementCluster.GetMachinesForCluster(ctx, util.ObjectKey(cluster), collections.OwnedMachines(rcp))
+	if err != nil {
+		return errors.Wrap(err, "failed to get list of owned machines")
+	}
+
+	readyMachines := ownedMachines.Filter(collections.IsReady())
+	for _, readyMachine := range readyMachines {
+		logger.Info("Ready Machine :", "machine-name", readyMachine.Name)
+	}
+
+	controlPlane, err := rke2.NewControlPlane(ctx, r.Client, cluster, rcp, ownedMachines)
+	if err != nil {
+		logger.Error(err, "failed to initialize control plane")
+		return err
+	}
+	rcp.Status.UpdatedReplicas = int32(len(controlPlane.UpToDateMachines()))
+
+	replicas := int32(len(ownedMachines))
+	desiredReplicas := *rcp.Spec.Replicas
+
+	// set basic data that does not require interacting with the workload cluster
+	// ReadyReplicas and UnavailableReplicas are set in case the function returns before updating them
+	rcp.Status.Replicas = replicas
+	rcp.Status.ReadyReplicas = 0
+	rcp.Status.UnavailableReplicas = replicas
+
+	// Return early if the deletion timestamp is set, because we don't want to try to connect to the workload cluster
+	// and we don't want to report resize condition (because it is set to deleting into reconcile delete).
+	if !rcp.DeletionTimestamp.IsZero() {
+		return nil
+	}
+
+	switch {
+	// We are scaling up
+	case replicas < desiredReplicas:
+		conditions.MarkFalse(rcp, controlplanev1.ResizedCondition, controlplanev1.ScalingUpReason, clusterv1.ConditionSeverityWarning, "Scaling up control plane to %d replicas (actual %d)", desiredReplicas, replicas)
+	// We are scaling down
+	case replicas > desiredReplicas:
+		conditions.MarkFalse(rcp, controlplanev1.ResizedCondition, controlplanev1.ScalingDownReason, clusterv1.ConditionSeverityWarning, "Scaling down control plane to %d replicas (actual %d)", desiredReplicas, replicas)
+	default:
+		// make sure last resize operation is marked as completed.
+		// NOTE: we are checking the number of machines ready so we report resize completed only when the machines
+		// are actually provisioned (vs reporting completed immediately after the last machine object is created).
+		if int32(len(readyMachines)) == replicas {
+			conditions.MarkTrue(rcp, controlplanev1.ResizedCondition)
+		}
+	}
+	kubeconfigSecret := corev1.Secret{}
+	err = r.Client.Get(ctx, types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      secret.Name(cluster.Name, secret.Kubeconfig),
+	}, &kubeconfigSecret)
+	if err != nil {
+		r.Log.Info("Kubeconfig secret does not yet exist")
+		return err
+	}
+
+	kubeConfig := kubeconfigSecret.Data[secret.KubeconfigDataName]
+	if kubeConfig == nil {
+		return fmt.Errorf("unable to find a value entry in the kubeconfig secret")
+	}
+
+	// TODO: Improve this to potentially check kubeconfig validity or even test connectivity to workloadCluster
+	//rcp.Status.ReadyReplicas = status.ReadyNodes
+	rcp.Status.ReadyReplicas = int32(len(readyMachines))
+	rcp.Status.UnavailableReplicas = replicas - rcp.Status.ReadyReplicas
+
+	if rcp.Status.ReadyReplicas > 0 {
+		rcp.Status.Initialized = true
+	}
+
+	if len(readyMachines) == len(ownedMachines) {
+		rcp.Status.Ready = true
+	}
+
+	conditions.MarkTrue(rcp, controlplanev1.AvailableCondition)
 	return nil
 }
 
@@ -244,6 +326,15 @@ func (r *RKE2ControlPlaneReconciler) reconcileNormal(ctx context.Context, cluste
 		logger.Info("Cluster infrastructure is not ready yet")
 		return ctrl.Result{}, nil
 	}
+
+	certificates := secret.NewCertificatesForInitialControlPlane()
+	controllerRef := metav1.NewControllerRef(rcp, controlplanev1.GroupVersion.WithKind("RKE2ControlPlane"))
+	if err := certificates.LookupOrGenerate(ctx, r.Client, util.ObjectKey(cluster), *controllerRef); err != nil {
+		logger.Error(err, "unable to lookup or create cluster certificates")
+		conditions.MarkFalse(rcp, controlplanev1.CertificatesAvailableCondition, controlplanev1.CertificatesGenerationFailedReason, clusterv1.ConditionSeverityWarning, err.Error())
+		return ctrl.Result{}, err
+	}
+	conditions.MarkTrue(rcp, controlplanev1.CertificatesAvailableCondition)
 
 	// If ControlPlaneEndpoint is not set, return early
 	if !cluster.Spec.ControlPlaneEndpoint.IsValid() {
@@ -262,13 +353,6 @@ func (r *RKE2ControlPlaneReconciler) reconcileNormal(ctx context.Context, cluste
 		logger.Error(err, "failed to retrieve control plane machines for cluster")
 		return ctrl.Result{}, err
 	}
-	//logger.V(5).Info()
-	//adoptableMachines := controlPlaneMachines.Filter(machinefilters.AdoptableControlPlaneMachines(cluster.Name))
-	//if len(adoptableMachines) > 0 {
-	//// We adopt the Machines and then wait for the update event for the ownership reference to re-queue them so the cache is up-to-date
-	//err = r.adoptMachines(ctx, rcp, adoptableMachines, cluster)
-	//return ctrl.Result{}, err
-	//}
 
 	logger.V(5).Info("Checking on Reconciler 2")
 
@@ -340,34 +424,122 @@ func (r *RKE2ControlPlaneReconciler) reconcileNormal(ctx context.Context, cluste
 func (r *RKE2ControlPlaneReconciler) reconcileDelete(ctx context.Context, cluster *clusterv1.Cluster, rcp *controlplanev1.RKE2ControlPlane) (res ctrl.Result, err error) {
 	logger := log.FromContext(ctx)
 
-	// TODO: Improve this part once there are dependencies on the Control Plane Object!
-	var ok bool = true
-	for _, finalizer := range rcp.GetObjectMeta().GetFinalizers() {
-		if ok {
-			ok = controllerutil.RemoveFinalizer(rcp, finalizer)
+	// Gets all machines, not just control plane machines.
+	allMachines, err := r.managementCluster.GetMachinesForCluster(ctx, util.ObjectKey(cluster))
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	ownedMachines := allMachines.Filter(collections.OwnedMachines(rcp))
+
+	// If no control plane machines remain, remove the finalizer
+	if len(ownedMachines) == 0 {
+		controllerutil.RemoveFinalizer(rcp, controlplanev1.RKE2ControlPlaneFinalizer)
+		return ctrl.Result{}, nil
+	}
+
+	controlPlane, err := rke2.NewControlPlane(ctx, r.Client, cluster, rcp, ownedMachines)
+	if err != nil {
+		logger.Error(err, "failed to initialize control plane")
+		return ctrl.Result{}, err
+	}
+
+	// Updates conditions reporting the status of static pods and the status of the etcd cluster.
+	// NOTE: Ignoring failures given that we are deleting
+	if _, err := r.reconcileControlPlaneConditions(ctx, controlPlane); err != nil {
+		logger.Info("failed to reconcile conditions", "error", err.Error())
+	}
+
+	// Aggregate the operational state of all the machines; while aggregating we are adding the
+	// source ref (reason@machine/name) so the problem can be easily tracked down to its source machine.
+	// However, during delete we are hiding the counter (1 of x) because it does not make sense given that
+	// all the machines are deleted in parallel.
+	conditions.SetAggregate(rcp, controlplanev1.MachinesReadyCondition, ownedMachines.ConditionGetters(), conditions.AddSourceRef(), conditions.WithStepCounterIf(false))
+
+	// Verify that only control plane machines remain
+	if len(allMachines) != len(ownedMachines) {
+		logger.Info("Waiting for worker nodes to be deleted first")
+		conditions.MarkFalse(rcp, controlplanev1.ResizedCondition, clusterv1.DeletingReason, clusterv1.ConditionSeverityInfo, "Waiting for worker nodes to be deleted first")
+		return ctrl.Result{RequeueAfter: deleteRequeueAfter}, nil
+	}
+
+	// Delete control plane machines in parallel
+	machinesToDelete := ownedMachines.Filter(collections.Not(collections.HasDeletionTimestamp))
+	var errs []error
+	for i := range machinesToDelete {
+		m := machinesToDelete[i]
+		logger := logger.WithValues("machine", m)
+		if err := r.Client.Delete(ctx, machinesToDelete[i]); err != nil && !apierrors.IsNotFound(err) {
+			logger.Error(err, "Failed to cleanup owned machine")
+			errs = append(errs, err)
 		}
 	}
-	if !ok {
-		logger.Info("unable to remove all finalizers")
-		err = fmt.Errorf("unable to remove all finalizers")
-		res = ctrl.Result{}
-		return
+	if len(errs) > 0 {
+		err := kerrors.NewAggregate(errs)
+		r.recorder.Eventf(rcp, corev1.EventTypeWarning, "FailedDelete",
+			"Failed to delete control plane Machines for cluster %s/%s control plane: %v", cluster.Namespace, cluster.Name, err)
+		return ctrl.Result{}, err
 	}
-
-	if err = r.Delete(ctx, rcp); err != nil {
-		res = ctrl.Result{RequeueAfter: 2 * time.Minute}
-		return
-	}
-
-	return ctrl.Result{}, nil
+	conditions.MarkFalse(rcp, controlplanev1.ResizedCondition, clusterv1.DeletingReason, clusterv1.ConditionSeverityInfo, "")
+	return ctrl.Result{RequeueAfter: deleteRequeueAfter}, nil
 }
+
+// 	// TODO: Improve this part once there are dependencies on the Control Plane Object!
+// 	var ok bool = true
+// 	for _, finalizer := range rcp.GetObjectMeta().GetFinalizers() {
+// 		if ok {
+// 			ok = controllerutil.RemoveFinalizer(rcp, finalizer)
+// 		}
+// 	}
+// 	if !ok {
+// 		logger.Info("unable to remove all finalizers")
+// 		err = fmt.Errorf("unable to remove all finalizers")
+// 		res = ctrl.Result{}
+// 		return
+// 	}
+
+// 	if err = r.Delete(ctx, rcp); err != nil {
+// 		res = ctrl.Result{RequeueAfter: 2 * time.Minute}
+// 		return
+// 	}
+
+// 	return ctrl.Result{}, nil
+// }
 
 func (r *RKE2ControlPlaneReconciler) reconcileKubeconfig(
 	ctx context.Context,
-	namespacedName types.NamespacedName,
+	clusterName client.ObjectKey,
 	endpoint clusterv1.APIEndpoint,
 	rcp *controlplanev1.RKE2ControlPlane) (ctrl.Result, error) {
 
+	if endpoint.IsZero() {
+		return ctrl.Result{}, nil
+	}
+
+	controllerOwnerRef := *metav1.NewControllerRef(rcp, controlplanev1.GroupVersion.WithKind("RKE2ControlPlane"))
+	configSecret, err := secret.GetFromNamespacedName(ctx, r.Client, clusterName, secret.Kubeconfig)
+	switch {
+	case apierrors.IsNotFound(errors.Cause(err)):
+		createErr := kubeconfig.CreateSecretWithOwner(
+			ctx,
+			r.Client,
+			clusterName,
+			endpoint.String(),
+			controllerOwnerRef,
+		)
+		if errors.Is(createErr, kubeconfig.ErrDependentCertificateNotFound) {
+			return ctrl.Result{RequeueAfter: dependentCertRequeueAfter}, nil
+		}
+		// always return if we have just created in order to skip rotation checks
+		return ctrl.Result{}, createErr
+
+	case err != nil:
+		return ctrl.Result{}, errors.Wrap(err, "failed to retrieve kubeconfig Secret")
+	}
+
+	// only do rotation on owned secrets
+	if !util.IsControlledBy(configSecret, rcp) {
+		return ctrl.Result{}, nil
+	}
 	return ctrl.Result{}, nil
 }
 
@@ -384,7 +556,7 @@ func (r *RKE2ControlPlaneReconciler) reconcileControlPlaneConditions(ctx context
 
 	workloadCluster, err := r.managementCluster.GetWorkloadCluster(ctx, util.ObjectKey(controlPlane.Cluster))
 	if err != nil {
-		logger.Info("ControlPlane not yet initialized")
+		logger.Info("Unable to get Workload cluster")
 		return ctrl.Result{}, errors.Wrap(err, "cannot get remote client to workload cluster")
 	}
 
@@ -416,8 +588,6 @@ func (r *RKE2ControlPlaneReconciler) upgradeControlPlane(
 		logger.Info("ControlPlane not yet initialized")
 		return ctrl.Result{}, nil
 	}
-
-	// TODO: handle reconciliation of etcd members and RKE2 config in case they get out of sync with cluster
 
 	workloadCluster, err := r.managementCluster.GetWorkloadCluster(ctx, util.ObjectKey(cluster))
 	if err != nil {

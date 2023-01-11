@@ -10,9 +10,11 @@
           "go.sum",
           "api",
           "internal",
-          "pkg"
+          "pkg",
+          "../pkg"
         ],
-        "label": "CAPRKE2"
+        "label": "CAPRKE2",
+        "kustomize_config": true
       }
     },
     {
@@ -26,9 +28,11 @@
             "go.sum",
             "api",
             "internal",
-            "pkg"
+            "pkg",
+            "../pkg"
           ],
-          "label": "CAPBPR"
+          "label": "CAPBPR",
+        "kustomize_config": true
         }
       }
 ]

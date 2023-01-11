@@ -26,13 +26,7 @@ type RKE2ConfigTemplateSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of RKE2ConfigTemplate. Edit RKE2configtemplate_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
-}
-
-// RKE2ConfigTemplateStatus defines the observed state of RKE2ConfigTemplate
-type RKE2ConfigTemplateStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Template RKE2ConfigTemplateResource `json:"template"`
 }
 
 //+kubebuilder:object:root=true
@@ -43,8 +37,7 @@ type RKE2ConfigTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   RKE2ConfigTemplateSpec   `json:"spec,omitempty"`
-	Status RKE2ConfigTemplateStatus `json:"status,omitempty"`
+	Spec RKE2ConfigTemplateSpec `json:"spec,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -54,6 +47,10 @@ type RKE2ConfigTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []RKE2ConfigTemplate `json:"items"`
+}
+
+type RKE2ConfigTemplateResource struct {
+	Spec RKE2ConfigSpec `json:"spec"`
 }
 
 func init() {
