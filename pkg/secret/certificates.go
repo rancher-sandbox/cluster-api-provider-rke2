@@ -108,7 +108,13 @@ func NewCertificatesForInitialControlPlane() Certificates {
 		},
 	}
 
-	return certificates
+	etcdCert := &Certificate{
+		Purpose:  EtcdCA,
+		CertFile: filepath.Join(certificatesDir, "etcd", "ca.crt"),
+		KeyFile:  filepath.Join(certificatesDir, "etcd", "ca.key"),
+	}
+
+	return append(certificates, etcdCert)
 }
 
 // GetByPurpose returns a certificate by the given name.

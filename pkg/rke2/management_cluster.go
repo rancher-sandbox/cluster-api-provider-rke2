@@ -18,10 +18,15 @@ package rke2
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/secret"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -45,7 +50,9 @@ type ManagementCluster interface {
 
 // Management holds operations on the management cluster.
 type Management struct {
-	Client ctrlclient.Reader
+	Client              ctrlclient.Reader
+	SecretCachingClient client.Reader
+	Tracker             *remote.ClusterCacheTracker
 }
 
 // RemoteClusterConnectionError represents a failure to connect to a remote cluster.
@@ -113,5 +120,34 @@ func (m *Management) GetWorkloadCluster(ctx context.Context, clusterKey ctrlclie
 		return nil, &RemoteClusterConnectionError{Name: clusterKey.String(), Err: err}
 	}
 
-	return NewWorkload(c), nil
+	return m.NewWorkload(ctx, c, clusterKey)
+}
+
+func (m *Management) getEtcdCAKeyPair(ctx context.Context, clusterKey client.ObjectKey) ([]byte, []byte, error) {
+	etcdCASecret := &corev1.Secret{}
+	etcdCAObjectKey := client.ObjectKey{
+		Namespace: clusterKey.Namespace,
+		Name:      fmt.Sprintf("%s-etcd", clusterKey.Name),
+	}
+
+	// Try to get the certificate via the cached client.
+	err := m.Get(ctx, etcdCAObjectKey, etcdCASecret)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			// Return error if we got an errors which is not a NotFound error.
+			return nil, nil, errors.Wrapf(err, "failed to get secret; etcd CA bundle %s/%s", etcdCAObjectKey.Namespace, etcdCAObjectKey.Name)
+		}
+
+		// Try to get the certificate via the uncached client.
+		if err := m.Client.Get(ctx, etcdCAObjectKey, etcdCASecret); err != nil {
+			return nil, nil, errors.Wrapf(err, "failed to get secret; etcd CA bundle %s/%s", etcdCAObjectKey.Namespace, etcdCAObjectKey.Name)
+		}
+	}
+
+	crtData, ok := etcdCASecret.Data[secret.TLSCrtDataName]
+	if !ok {
+		return nil, nil, errors.Errorf("etcd tls crt does not exist for cluster %s/%s", clusterKey.Namespace, clusterKey.Name)
+	}
+	keyData := etcdCASecret.Data[secret.TLSKeyDataName]
+	return crtData, keyData, nil
 }
