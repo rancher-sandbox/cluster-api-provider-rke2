@@ -35,6 +35,7 @@ runcmd:
   - '/opt/rke2-cis-script.sh'{{ end }}
   - 'systemctl enable rke2-server.service'
   - 'systemctl start rke2-server.service'
+  - 'kubectl create secret tls cluster-etcd -o yaml --dry-run=client -n kube-system --cert=/var/lib/rancher/rke2/server/tls/etcd/server-client.crt --key=/var/lib/rancher/rke2/server/tls/etcd/server-client.key --kubeconfig /var/lib/rancher/rke2/server/cred/api-server.kubeconfig | kubectl apply -f- --kubeconfig /var/lib/rancher/rke2/server/cred/api-server.kubeconfig'
   - 'mkdir /run/cluster-api' 
   - '{{ .SentinelFileCommand }}'
 {{- template "commands" .PostRKE2Commands }}
