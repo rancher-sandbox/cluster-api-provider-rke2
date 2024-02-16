@@ -27,6 +27,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
@@ -90,18 +91,26 @@ func (m *Management) NewWorkload(ctx context.Context, cl client.Client, clusterK
 	restConfig.Timeout = 30 * time.Second
 
 	// Retrieves the etcd CA key Pair
-	crtData, keyData, err := m.getEtcdCAKeyPair(ctx, clusterKey)
-	if err != nil {
+	keyPair, err := m.getEtcdCAKeyPair(ctx, clusterKey)
+	if client.IgnoreNotFound(err) != nil {
 		return nil, err
+	} else if apierrors.IsNotFound(err) || keyPair == nil {
+		keyPair, err = m.getRemoteKeyPair(ctx, clusterKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if keyPair.Cert == nil && err == nil {
+		panic(1)
 	}
 
-	clientCert, err := tls.X509KeyPair(crtData, keyData)
+	clientCert, err := tls.X509KeyPair(keyPair.Cert, keyPair.Key)
 	if err != nil {
 		return nil, err
 	}
 
 	caPool := x509.NewCertPool()
-	caPool.AppendCertsFromPEM(crtData)
+	caPool.AppendCertsFromPEM(keyPair.Cert)
 	tlsConfig := &tls.Config{
 		RootCAs:            caPool,
 		Certificates:       []tls.Certificate{clientCert},

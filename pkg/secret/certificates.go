@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -79,49 +80,97 @@ const (
 // Purpose is the name to append to the secret generated for a cluster.
 type Purpose string
 
-// Certificate represents a single certificate CA.
-type Certificate struct {
-	Generated         bool
+type CertificatesGenerator interface {
+	Lookup(ctx context.Context, ctrlclient client.Reader, clusterName client.ObjectKey) error
+	Generate() error
+	SaveGenerated(ctx context.Context, ctrlclient client.Client, clusterName client.ObjectKey, owner metav1.OwnerReference) error
+	LookupOrGenerate(ctx context.Context, ctrlclient client.Client, clusterName client.ObjectKey, owner metav1.OwnerReference) error
+}
+
+type Certificate interface {
+	GetPurpose() Purpose
+	GetKeyPair() *certs.KeyPair
+	SetKeyPair(*certs.KeyPair)
+	Lookup(context.Context, client.Reader, client.ObjectKey) (*corev1.Secret, error)
+	Generate() error
+	IsGenerated() bool
+	IsExternal() bool
+	AsSecret(clusterName client.ObjectKey, owner metav1.OwnerReference) *corev1.Secret
+	AsFiles() []bootstrapv1.File
+}
+
+// ManagedCertificate represents a single certificate CA.
+type ManagedCertificate struct {
 	External          bool
+	Generated         bool
 	Purpose           Purpose
 	KeyPair           *certs.KeyPair
 	CertFile, KeyFile string
 }
 
+// Lookup implements certificate lookup.
+func (c *ManagedCertificate) Lookup(ctx context.Context, ctrlclient client.Reader, clusterName client.ObjectKey) (*corev1.Secret, error) {
+	s := &corev1.Secret{}
+	key := client.ObjectKey{
+		Name:      Name(clusterName.Name, c.GetPurpose()),
+		Namespace: clusterName.Namespace,
+	}
+
+	if err := ctrlclient.Get(ctx, key, s); err != nil {
+		if apierrors.IsNotFound(err) {
+			if c.IsExternal() {
+				return nil, errors.WithMessage(err, "external certificate not found")
+			}
+
+			return nil, nil
+		}
+
+		return nil, errors.WithStack(err)
+	}
+
+	return s, nil
+}
+
+// ExternalCertificate represents a single certificate CA.
+type ExternalCertificate struct {
+	client.Reader
+	Purpose   Purpose
+	Generated bool
+	KeyPair   *certs.KeyPair
+}
+
+var _ CertificatesGenerator = &Certificates{}
+var _ Certificate = &ManagedCertificate{}
+var _ Certificate = &ExternalCertificate{}
+
 // Certificates are the certificates necessary to bootstrap a cluster.
-type Certificates []*Certificate
+type Certificates []Certificate
 
 // NewCertificatesForInitialControlPlane returns a list of certificates configured for a control plane node.
 func NewCertificatesForInitialControlPlane() Certificates {
 	certificatesDir := DefaultCertificatesDir
 
 	certificates := Certificates{
-		&Certificate{
+		&ManagedCertificate{
 			Purpose:  ClusterCA,
 			CertFile: filepath.Join(certificatesDir, "server-ca.crt"),
 			KeyFile:  filepath.Join(certificatesDir, "server-ca.key"),
 		},
-		&Certificate{
+		&ManagedCertificate{
 			Purpose:  ClientClusterCA,
 			CertFile: filepath.Join(certificatesDir, "client-ca.crt"),
 			KeyFile:  filepath.Join(certificatesDir, "client-ca.key"),
 		},
 	}
 
-	etcdCert := &Certificate{
-		Purpose:  EtcdCA,
-		CertFile: filepath.Join(certificatesDir, "etcd", "client.crt"),
-		KeyFile:  filepath.Join(certificatesDir, "etcd", "client.key"),
-	}
-
-	return append(certificates, etcdCert)
+	return certificates
 }
 
 // GetByPurpose returns a certificate by the given name.
 // This could be removed if we use a map instead of a slice to hold certificates, however other code becomes more complex.
-func (c Certificates) GetByPurpose(purpose Purpose) *Certificate {
+func (c Certificates) GetByPurpose(purpose Purpose) Certificate {
 	for _, certificate := range c {
-		if certificate.Purpose == purpose {
+		if certificate.GetPurpose() == purpose {
 			return certificate
 		}
 	}
@@ -130,40 +179,28 @@ func (c Certificates) GetByPurpose(purpose Purpose) *Certificate {
 }
 
 // Lookup looks up each certificate from secrets and populates the certificate with the secret data.
-func (c Certificates) Lookup(ctx context.Context, ctrlclient client.Client, clusterName client.ObjectKey) error {
+func (c Certificates) Lookup(ctx context.Context, ctrlclient client.Reader, clusterName client.ObjectKey) error {
 	// Look up each certificate as a secret and populate the certificate/key
 	for _, certificate := range c {
-		s := &corev1.Secret{}
-		key := client.ObjectKey{
-			Name:      Name(clusterName.Name, certificate.Purpose),
-			Namespace: clusterName.Namespace,
+		s, err := certificate.Lookup(ctx, ctrlclient, clusterName)
+		if err != nil || s == nil {
+			return err
 		}
 
-		if err := ctrlclient.Get(ctx, key, s); err != nil {
-			if apierrors.IsNotFound(err) {
-				if certificate.External {
-					return errors.WithMessage(err, "external certificate not found")
-				}
-
-				continue
-			}
-
-			return errors.WithStack(err)
-		}
 		// If a user has a badly formatted secret it will prevent the cluster from working.
 		kp, err := secretToKeyPair(s)
 		if err != nil {
 			return err
 		}
 
-		certificate.KeyPair = kp
+		certificate.SetKeyPair(kp)
 	}
 
 	return nil
 }
 
 // Generate will generate any certificates that do not have KeyPair data.
-func (c *Certificate) Generate() error {
+func (c *ManagedCertificate) Generate() error {
 	// Do not generate the APIServerEtcdClient key pair. It is user supplied
 	if c.Purpose == APIServerEtcdClient {
 		return nil
@@ -179,16 +216,104 @@ func (c *Certificate) Generate() error {
 		return err
 	}
 
-	c.KeyPair = kp
+	c.SetKeyPair(kp)
 	c.Generated = true
 
 	return nil
 }
 
+func (c *ManagedCertificate) GetPurpose() Purpose {
+	return c.Purpose
+}
+
+func (c *ManagedCertificate) GetKeyPair() *certs.KeyPair {
+	return c.KeyPair
+}
+
+func (c *ManagedCertificate) SetKeyPair(keyPair *certs.KeyPair) {
+	c.KeyPair = keyPair
+}
+
+func (c *ManagedCertificate) IsGenerated() bool {
+	return c.Generated
+}
+
+func (c *ManagedCertificate) IsExternal() bool {
+	return c.External
+}
+
+// Lookup implements certificate lookup for external source.
+func (c *ExternalCertificate) Lookup(ctx context.Context, _ client.Reader, clusterName client.ObjectKey) (*corev1.Secret, error) {
+	s := &corev1.Secret{}
+	key := client.ObjectKey{
+		Name:      Name("cluster", c.GetPurpose()),
+		Namespace: metav1.NamespaceSystem,
+	}
+
+	if err := c.Get(ctx, key, s); err != nil {
+		if apierrors.IsNotFound(err) {
+			if c.IsExternal() {
+				return nil, errors.WithMessage(err, "external certificate not found")
+			}
+
+			return nil, nil
+		}
+
+		return nil, errors.WithStack(err)
+	}
+
+	return s, nil
+}
+
+// AsFiles for external certificate is a no-op, due to being externally managed.
+func (*ExternalCertificate) AsFiles() []bootstrapv1.File {
+	return []bootstrapv1.File{}
+}
+
+// AsSecret implements Certificate.
+func (c *ExternalCertificate) AsSecret(clusterName types.NamespacedName, owner metav1.OwnerReference) *corev1.Secret {
+	s := asSecret(map[string][]byte{
+		TLSKeyDataName: c.KeyPair.Key,
+		TLSCrtDataName: c.KeyPair.Cert,
+	}, c.GetPurpose(), clusterName, owner)
+
+	return s
+}
+
+// Generate implements key pair collection from external source.
+func (c *ExternalCertificate) Generate() error {
+	return nil
+}
+
+// GetKeyPair implements key pair retriever for ExternalCertificate.
+func (c *ExternalCertificate) GetKeyPair() *certs.KeyPair {
+	return c.KeyPair
+}
+
+// GetPurpose implements purpose check for ExternalCertificate.
+func (c *ExternalCertificate) GetPurpose() Purpose {
+	return c.Purpose
+}
+
+// IsExternal represents extenally managed scenario for ExternalCertificate so is always true.
+func (*ExternalCertificate) IsExternal() bool {
+	return true
+}
+
+// IsGenerated is always false for externally managed certificate.
+func (c *ExternalCertificate) IsGenerated() bool {
+	return true
+}
+
+// SetKeyPair sets ExternalCertificate key pair.
+func (c *ExternalCertificate) SetKeyPair(keyPair *certs.KeyPair) {
+	c.KeyPair = keyPair
+}
+
 // Generate will generate any certificates that do not have KeyPair data.
 func (c Certificates) Generate() error {
 	for _, certificate := range c {
-		if certificate.KeyPair == nil {
+		if certificate.GetKeyPair() == nil {
 			err := certificate.Generate()
 			if err != nil {
 				return err
@@ -202,12 +327,12 @@ func (c Certificates) Generate() error {
 // SaveGenerated will save any certificates that have been generated as Kubernetes secrets.
 func (c Certificates) SaveGenerated(ctx context.Context, ctrlclient client.Client, clusterName client.ObjectKey, owner metav1.OwnerReference) error {
 	for _, certificate := range c {
-		if !certificate.Generated {
-			continue
-		}
-
 		s := certificate.AsSecret(clusterName, owner)
-		if err := ctrlclient.Create(ctx, s); err != nil {
+		if err := ctrlclient.Get(ctx, client.ObjectKeyFromObject(s), &corev1.Secret{}); apierrors.IsNotFound(err) {
+			if err := ctrlclient.Create(ctx, s); client.IgnoreAlreadyExists(err) != nil {
+				return errors.WithStack(err)
+			}
+		} else if err != nil {
 			return errors.WithStack(err)
 		}
 	}
@@ -237,21 +362,11 @@ func (c Certificates) LookupOrGenerate(
 }
 
 // AsSecret converts a single certificate into a Kubernetes secret.
-func (c *Certificate) AsSecret(clusterName client.ObjectKey, owner metav1.OwnerReference) *corev1.Secret {
-	s := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: clusterName.Namespace,
-			Name:      Name(clusterName.Name, c.Purpose),
-			Labels: map[string]string{
-				clusterv1.ClusterNameLabel: clusterName.Name,
-			},
-		},
-		Data: map[string][]byte{
-			TLSKeyDataName: c.KeyPair.Key,
-			TLSCrtDataName: c.KeyPair.Cert,
-		},
-		Type: clusterv1.ClusterSecretType,
-	}
+func (c *ManagedCertificate) AsSecret(clusterName client.ObjectKey, owner metav1.OwnerReference) *corev1.Secret {
+	s := asSecret(map[string][]byte{
+		TLSKeyDataName: c.KeyPair.Key,
+		TLSCrtDataName: c.KeyPair.Cert,
+	}, c.GetPurpose(), clusterName, owner)
 
 	if c.Generated {
 		s.OwnerReferences = []metav1.OwnerReference{owner}
@@ -261,7 +376,7 @@ func (c *Certificate) AsSecret(clusterName client.ObjectKey, owner metav1.OwnerR
 }
 
 // AsFiles converts the certificate to a slice of Files that may have 0, 1 or 2 Files.
-func (c *Certificate) AsFiles() []bootstrapv1.File {
+func (c *ManagedCertificate) AsFiles() []bootstrapv1.File {
 	out := make([]bootstrapv1.File, 0)
 	if len(c.KeyPair.Cert) > 0 {
 		out = append(out, bootstrapv1.File{
@@ -412,6 +527,20 @@ func generateServiceAccountKeys() (*certs.KeyPair, error) {
 		Cert: saPub,
 		Key:  certs.EncodePrivateKeyPEM(saCreds),
 	}, nil
+}
+
+func asSecret(data map[string][]byte, purpose Purpose, clusterName types.NamespacedName, owner metav1.OwnerReference) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: clusterName.Namespace,
+			Name:      Name(clusterName.Name, purpose),
+			Labels: map[string]string{
+				clusterv1.ClusterNameLabel: clusterName.Name,
+			},
+		},
+		Data: data,
+		Type: clusterv1.ClusterSecretType,
+	}
 }
 
 // GetFromNamespacedName retrieves the specified Secret (if any) from the given

@@ -253,7 +253,7 @@ func (r *RKE2ControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr c
 	}
 
 	if r.managementClusterUncached == nil {
-		r.managementClusterUncached = &rke2.Management{Client: mgr.GetAPIReader()}
+		r.managementClusterUncached = &rke2.Management{Client: mgr.GetClient()}
 	}
 
 	return nil
