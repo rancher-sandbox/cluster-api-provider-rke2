@@ -144,7 +144,7 @@ func NewClient(ctx context.Context, config ClientConfiguration) (*Client, error)
 		return nil, errors.Wrap(err, "unable to create a dialer for etcd client")
 	}
 
-	etcdClient, err := clientv3.New(clientv3.Config{
+	c := clientv3.Config{
 		Endpoints:   []string{config.Endpoint}, // NOTE: endpoint is used only as a host for certificate validation, the network connection is defined by DialOptions.
 		DialTimeout: config.DialTimeout,
 		DialOptions: []grpc.DialOption{
@@ -152,9 +152,11 @@ func NewClient(ctx context.Context, config ClientConfiguration) (*Client, error)
 			grpc.WithContextDialer(dialer.DialContextWithAddr),
 		},
 		TLS: config.TLSConfig,
-	})
+	}
+
+	etcdClient, err := clientv3.New(c)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to create etcd client")
+		return nil, errors.Wrap(err, "unable to init etcd client")
 	}
 
 	callTimeout := config.CallTimeout

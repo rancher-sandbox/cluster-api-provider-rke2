@@ -20,13 +20,13 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/proxy"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 )
 
@@ -97,15 +97,10 @@ func (c *EtcdClientGenerator) ForLeader(ctx context.Context, nodeNames []string)
 		return nil, errors.New("invalid argument: forLeader can't be called with an empty list of nodes")
 	}
 
-	nodes := sets.Set[string]{}
-	for _, n := range nodeNames {
-		nodes.Insert(n)
-	}
-
 	// Loop through the existing control plane nodes.
 	var errs []error
 	for _, nodeName := range nodeNames {
-		cl, err := c.getLeaderClient(ctx, nodeName, nodes)
+		cl, err := c.getLeaderClient(ctx, nodeName, nodeNames)
 		if err != nil {
 			if errors.Is(err, errEtcdNodeConnection) {
 				errs = append(errs, err)
@@ -122,7 +117,7 @@ func (c *EtcdClientGenerator) ForLeader(ctx context.Context, nodeNames []string)
 // getLeaderClient provides an etcd client connected to the leader. It returns an
 // errEtcdNodeConnection if there was a connection problem with the given etcd
 // node, which should be considered non-fatal by the caller.
-func (c *EtcdClientGenerator) getLeaderClient(ctx context.Context, nodeName string, allNodes sets.Set[string]) (*Client, error) {
+func (c *EtcdClientGenerator) getLeaderClient(ctx context.Context, nodeName string, nodeNames []string) (*Client, error) {
 	// Get a temporary client to the etcd instance hosted on the node.
 	client, err := c.ForFirstAvailableNode(ctx, []string{nodeName})
 	if err != nil {
@@ -148,10 +143,17 @@ func (c *EtcdClientGenerator) getLeaderClient(ctx context.Context, nodeName stri
 	// If we found the leader, and it is one of the nodes,
 	// get a connection to the etcd leader via the node hosting it.
 	if leaderMember != nil {
-		if !allNodes.Has(leaderMember.Name) {
+		nodeName := ""
+		for _, name := range nodeNames {
+			if strings.Contains(leaderMember.Name, name) {
+				nodeName = name
+				break
+			}
+		}
+		if nodeName == "" {
 			return nil, errors.Errorf("etcd leader is reported as %x with name %q, but we couldn't find a corresponding Node in the cluster", leaderMember.ID, leaderMember.Name)
 		}
-		client, err = c.ForFirstAvailableNode(ctx, []string{leaderMember.Name})
+		client, err = c.ForFirstAvailableNode(ctx, []string{nodeName})
 		return client, err
 	}
 

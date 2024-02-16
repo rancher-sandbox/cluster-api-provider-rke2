@@ -18,6 +18,8 @@ limitations under the License.
 package util
 
 import (
+	"strings"
+
 	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/etcd"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -25,7 +27,7 @@ import (
 // MemberForName returns the etcd member with the matching name.
 func MemberForName(members []*etcd.Member, name string) *etcd.Member {
 	for _, m := range members {
-		if m.Name == name {
+		if strings.Contains(m.Name, name) {
 			return m
 		}
 	}

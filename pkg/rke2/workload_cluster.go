@@ -18,14 +18,9 @@ package rke2
 
 import (
 	"context"
-	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"fmt"
-	"math/big"
 	"strings"
 	"time"
 
@@ -41,7 +36,6 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
-	"sigs.k8s.io/cluster-api/util/certs"
 	"sigs.k8s.io/cluster-api/util/collections"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -69,7 +63,7 @@ type WorkloadCluster interface {
 	// Upgrade related tasks.
 
 	//	AllowBootstrapTokensToGetNodes(ctx context.Context) error
-	
+
 	// State recovery tasks.
 	RemoveEtcdMemberForMachine(ctx context.Context, machine *clusterv1.Machine) error
 	ForwardEtcdLeadership(ctx context.Context, machine *clusterv1.Machine, leaderCandidate *clusterv1.Machine) error
@@ -101,12 +95,7 @@ func (m *Management) NewWorkload(ctx context.Context, cl client.Client, clusterK
 		return nil, err
 	}
 
-	clientKey, err := m.Tracker.GetEtcdClientCertificateKey(ctx, clusterKey)
-	if err != nil {
-		return nil, err
-	}
-
-	clientCert, err := generateClientCert(crtData, keyData, clientKey)
+	clientCert, err := tls.X509KeyPair(crtData, keyData)
 	if err != nil {
 		return nil, err
 	}
@@ -114,62 +103,18 @@ func (m *Management) NewWorkload(ctx context.Context, cl client.Client, clusterK
 	caPool := x509.NewCertPool()
 	caPool.AppendCertsFromPEM(crtData)
 	tlsConfig := &tls.Config{
-		RootCAs:      caPool,
-		Certificates: []tls.Certificate{clientCert},
-		MinVersion:   tls.VersionTLS12,
+		RootCAs:            caPool,
+		Certificates:       []tls.Certificate{clientCert},
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: true,
 	}
-	tlsConfig.InsecureSkipVerify = true
 
 	return &Workload{
 		Client:              cl,
 		Nodes:               map[string]*corev1.Node{},
 		nodePatchHelpers:    map[string]*patch.Helper{},
-		etcdClientGenerator: etcd.NewEtcdClientGenerator(restConfig, tlsConfig, 30*time.Second, 45*time.Second),
+		etcdClientGenerator: etcd.NewEtcdClientGenerator(restConfig, tlsConfig, 10*time.Second, 15*time.Second),
 	}, nil
-}
-
-func generateClientCert(caCertEncoded, caKeyEncoded []byte, clientKey *rsa.PrivateKey) (tls.Certificate, error) {
-	caCert, err := certs.DecodeCertPEM(caCertEncoded)
-	if err != nil {
-		return tls.Certificate{}, err
-	}
-	caKey, err := certs.DecodePrivateKeyPEM(caKeyEncoded)
-	if err != nil {
-		return tls.Certificate{}, err
-	}
-	x509Cert, err := newClientCert(caCert, clientKey, caKey)
-	if err != nil {
-		return tls.Certificate{}, err
-	}
-	return tls.X509KeyPair(certs.EncodeCertPEM(x509Cert), certs.EncodePrivateKeyPEM(clientKey))
-}
-
-func newClientCert(caCert *x509.Certificate, key *rsa.PrivateKey, caKey crypto.Signer) (*x509.Certificate, error) {
-	cfg := certs.Config{
-		CommonName: "cluster-api.x-k8s.io",
-	}
-
-	now := time.Now().UTC()
-
-	tmpl := x509.Certificate{
-		SerialNumber: new(big.Int).SetInt64(0),
-		Subject: pkix.Name{
-			CommonName:   cfg.CommonName,
-			Organization: cfg.Organization,
-		},
-		NotBefore:   now.Add(time.Minute * -5),
-		NotAfter:    now.Add(time.Hour * 24 * 365 * 10), // 10 years
-		KeyUsage:    x509.KeyUsageDigitalSignature,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-
-	b, err := x509.CreateCertificate(rand.Reader, &tmpl, caCert, key.Public(), caKey)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create signed client certificate: %+v", tmpl)
-	}
-
-	c, err := x509.ParseCertificate(b)
-	return c, errors.WithStack(err)
 }
 
 // InitWorkload prepares workload for evaluating status conditions.

@@ -110,8 +110,8 @@ func NewCertificatesForInitialControlPlane() Certificates {
 
 	etcdCert := &Certificate{
 		Purpose:  EtcdCA,
-		CertFile: filepath.Join(certificatesDir, "etcd", "ca.crt"),
-		KeyFile:  filepath.Join(certificatesDir, "etcd", "ca.key"),
+		CertFile: filepath.Join(certificatesDir, "etcd", "client.crt"),
+		KeyFile:  filepath.Join(certificatesDir, "etcd", "client.key"),
 	}
 
 	return append(certificates, etcdCert)

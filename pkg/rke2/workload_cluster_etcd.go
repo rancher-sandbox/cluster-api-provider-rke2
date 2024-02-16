@@ -18,6 +18,8 @@ package rke2
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
@@ -25,6 +27,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // ReconcileEtcdMembers iterates over all etcd members and finds members that do not have corresponding nodes.
@@ -66,7 +69,7 @@ loopmembers:
 		}
 
 		for _, nodeName := range nodeNames {
-			if member.Name == nodeName {
+			if strings.Contains(member.Name, nodeName) {
 				// We found the matching node, continue with the outer loop.
 				continue loopmembers
 			}
@@ -103,7 +106,7 @@ func (w *Workload) removeMemberForNode(ctx context.Context, name string) error {
 	// Exclude node being removed from etcd client node list
 	var remainingNodes []string
 	for _, n := range controlPlaneNodes.Items {
-		if n.Name != name {
+		if !strings.Contains(name, n.Name) {
 			remainingNodes = append(remainingNodes, n.Name)
 		}
 	}
@@ -128,6 +131,8 @@ func (w *Workload) removeMemberForNode(ctx context.Context, name string) error {
 	if err := etcdClient.RemoveMember(ctx, member.ID); err != nil {
 		return errors.Wrap(err, "failed to remove member from etcd")
 	}
+
+	log.FromContext(ctx).Info(fmt.Sprintf("Removed member: %s", member.Name))
 
 	return nil
 }
@@ -174,6 +179,9 @@ func (w *Workload) ForwardEtcdLeadership(ctx context.Context, machine *clusterv1
 	if nextLeader == nil {
 		return errors.Errorf("failed to get etcd member from node %q", leaderCandidate.Status.NodeRef.Name)
 	}
+
+	log.FromContext(ctx).Info(fmt.Sprintf("Moving leader from %s to %s", currentMember.Name, nextLeader.Name))
+
 	if err := etcdClient.MoveLeader(ctx, nextLeader.ID); err != nil {
 		return errors.Wrapf(err, "failed to move leader")
 	}
