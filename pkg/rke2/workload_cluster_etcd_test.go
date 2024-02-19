@@ -67,7 +67,7 @@ func TestRemoveEtcdMemberForMachine(t *testing.T) {
 	tests := []struct {
 		name                string
 		machine             *clusterv1.Machine
-		etcdClientGenerator etcd.EtcdClientFor
+		etcdClientGenerator etcd.ClientFor
 		objs                []client.Object
 		expectErr           bool
 	}{
@@ -182,7 +182,7 @@ func TestForwardEtcdLeadership(t *testing.T) {
 			name                string
 			machine             *clusterv1.Machine
 			leaderCandidate     *clusterv1.Machine
-			etcdClientGenerator etcd.EtcdClientFor
+			etcdClientGenerator etcd.ClientFor
 			k8sClient           client.Client
 			expectErr           bool
 		}{
@@ -399,7 +399,7 @@ func TestReconcileEtcdMembers(t *testing.T) {
 		kubernetesVersion   semver.Version
 		objs                []client.Object
 		nodes               []string
-		etcdClientGenerator etcd.EtcdClientFor
+		etcdClientGenerator etcd.ClientFor
 		expectErr           bool
 		assert              func(*WithT, client.Client)
 	}{

@@ -23,11 +23,12 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/proxy"
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
+
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/proxy"
 )
 
 // GRPCDial is a function that creates a connection to a given endpoint.
@@ -145,7 +146,8 @@ func NewClient(ctx context.Context, config ClientConfiguration) (*Client, error)
 	}
 
 	c := clientv3.Config{
-		Endpoints:   []string{config.Endpoint}, // NOTE: endpoint is used only as a host for certificate validation, the network connection is defined by DialOptions.
+		// NOTE: endpoint is used only as a host for certificate validation, the network connection is defined by DialOptions.
+		Endpoints:   []string{config.Endpoint},
 		DialTimeout: config.DialTimeout,
 		DialOptions: []grpc.DialOption{
 			grpc.WithBlock(), // block until the underlying connection is up
@@ -167,8 +169,10 @@ func NewClient(ctx context.Context, config ClientConfiguration) (*Client, error)
 	client, err := newEtcdClient(ctx, etcdClient, callTimeout)
 	if err != nil {
 		closeErr := etcdClient.Close()
+
 		return nil, errors.Wrap(kerrors.NewAggregate([]error{err, closeErr}), "unable to create etcd client")
 	}
+
 	return client, nil
 }
 
@@ -217,14 +221,17 @@ func (c *Client) Members(ctx context.Context) ([]*Member, error) {
 
 	clusterID := response.Header.GetClusterId()
 	members := make([]*Member, 0)
+
 	for _, m := range response.Members {
 		newMember := pbMemberToMember(m)
 		newMember.ClusterID = clusterID
+
 		for _, c := range alarms {
 			if c.MemberID == newMember.ID {
 				newMember.Alarms = append(newMember.Alarms, c.Type)
 			}
 		}
+
 		members = append(members, newMember)
 	}
 
@@ -237,6 +244,7 @@ func (c *Client) MoveLeader(ctx context.Context, newLeaderID uint64) error {
 	defer cancel()
 
 	_, err := c.EtcdClient.MoveLeader(ctx, newLeaderID)
+
 	return errors.Wrapf(err, "failed to move etcd leader: %v", newLeaderID)
 }
 
@@ -246,6 +254,7 @@ func (c *Client) RemoveMember(ctx context.Context, id uint64) error {
 	defer cancel()
 
 	_, err := c.EtcdClient.MemberRemove(ctx, id)
+
 	return errors.Wrapf(err, "failed to remove member: %v", id)
 }
 

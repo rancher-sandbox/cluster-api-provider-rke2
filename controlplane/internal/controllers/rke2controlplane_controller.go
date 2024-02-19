@@ -537,17 +537,19 @@ func (r *RKE2ControlPlaneReconciler) reconcileNormal(
 
 // GetWorkloadCluster builds a cluster object.
 // The cluster comes with an etcd client generator to connect to any etcd pod living on a managed machine.
-func (c *RKE2ControlPlaneReconciler) GetWorkloadCluster(ctx context.Context, controlPlane *rke2.ControlPlane) (rke2.WorkloadCluster, error) {
-	if c.workloadCluster != nil {
-		return c.workloadCluster, nil
+func (r *RKE2ControlPlaneReconciler) GetWorkloadCluster(ctx context.Context, controlPlane *rke2.ControlPlane) (rke2.WorkloadCluster, error) {
+	if r.workloadCluster != nil {
+		return r.workloadCluster, nil
 	}
 
-	workloadCluster, err := c.managementCluster.GetWorkloadCluster(ctx, client.ObjectKeyFromObject(controlPlane.Cluster))
+	workloadCluster, err := r.managementCluster.GetWorkloadCluster(ctx, client.ObjectKeyFromObject(controlPlane.Cluster))
 	if err != nil {
 		return nil, err
 	}
-	c.workloadCluster = workloadCluster
-	return c.workloadCluster, nil
+
+	r.workloadCluster = workloadCluster
+
+	return r.workloadCluster, nil
 }
 
 // reconcileEtcdMembers ensures the number of etcd members is in sync with the number of machines/nodes.
@@ -564,11 +566,13 @@ func (r *RKE2ControlPlaneReconciler) reconcileEtcdMembers(ctx context.Context, c
 
 	// Collect all the node names.
 	nodeNames := []string{}
+
 	for _, machine := range controlPlane.Machines {
 		if machine.Status.NodeRef == nil {
 			// If there are provisioning machines (machines without a node yet), return.
 			return nil
 		}
+
 		nodeNames = append(nodeNames, machine.Status.NodeRef.Name)
 	}
 

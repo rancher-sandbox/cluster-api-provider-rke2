@@ -59,21 +59,23 @@ func (c *Conn) RemoteAddr() net.Addr {
 
 // SetDeadline sets the read and write deadlines to the specified interval.
 func (c *Conn) SetDeadline(t time.Time) error {
-	// TODO: Handle deadlines
 	c.readDeadline = t
 	c.writeDeadline = t
+
 	return nil
 }
 
 // SetWriteDeadline sets the read and write deadlines to the specified interval.
 func (c *Conn) SetWriteDeadline(t time.Time) error {
 	c.writeDeadline = t
+
 	return nil
 }
 
 // SetReadDeadline sets the read and write deadlines to the specified interval.
 func (c *Conn) SetReadDeadline(t time.Time) error {
 	c.readDeadline = t
+
 	return nil
 }
 

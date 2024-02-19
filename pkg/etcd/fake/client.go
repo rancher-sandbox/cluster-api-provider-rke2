@@ -23,6 +23,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
+// FakeEtcdClient represents a testing fake client for etcd interactions.
 type FakeEtcdClient struct { //nolint:revive
 	AlarmResponse        *clientv3.AlarmResponse
 	EtcdEndpoints        []string
@@ -36,33 +37,46 @@ type FakeEtcdClient struct { //nolint:revive
 	RemovedMember        uint64
 }
 
+// Endpoints returns available etcd endpoint.
 func (c *FakeEtcdClient) Endpoints() []string {
 	return c.EtcdEndpoints
 }
 
+// MoveLeader is moving etcd leader.
 func (c *FakeEtcdClient) MoveLeader(_ context.Context, i uint64) (*clientv3.MoveLeaderResponse, error) {
 	c.MovedLeader = i
+
 	return c.MoveLeaderResponse, c.ErrorResponse
 }
 
+// Close is closing fake client (no-op).
 func (c *FakeEtcdClient) Close() error {
 	return nil
 }
 
+// AlarmList returns a list or alarms on etcd cluster.
 func (c *FakeEtcdClient) AlarmList(_ context.Context) (*clientv3.AlarmResponse, error) {
 	return c.AlarmResponse, c.ErrorResponse
 }
 
+// MemberList returnl a list of etcd members for the cluster.
 func (c *FakeEtcdClient) MemberList(_ context.Context) (*clientv3.MemberListResponse, error) {
 	return c.MemberListResponse, c.ErrorResponse
 }
+
+// MemberRemove removes the member by id.
 func (c *FakeEtcdClient) MemberRemove(_ context.Context, i uint64) (*clientv3.MemberRemoveResponse, error) {
 	c.RemovedMember = i
+
 	return c.MemberRemoveResponse, c.ErrorResponse
 }
+
+// MemberUpdate updates the member by id.
 func (c *FakeEtcdClient) MemberUpdate(_ context.Context, _ uint64, _ []string) (*clientv3.MemberUpdateResponse, error) {
 	return c.MemberUpdateResponse, c.ErrorResponse
 }
+
+// Status return a status response for the etcd member.
 func (c *FakeEtcdClient) Status(_ context.Context, _ string) (*clientv3.StatusResponse, error) {
 	return c.StatusResponse, nil
 }

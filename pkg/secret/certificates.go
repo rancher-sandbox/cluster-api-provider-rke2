@@ -80,6 +80,7 @@ const (
 // Purpose is the name to append to the secret generated for a cluster.
 type Purpose string
 
+// CertificatesGenerator is an interface for certificate content generation and storage.
 type CertificatesGenerator interface {
 	Lookup(ctx context.Context, ctrlclient client.Reader, clusterName client.ObjectKey) error
 	Generate() error
@@ -87,11 +88,12 @@ type CertificatesGenerator interface {
 	LookupOrGenerate(ctx context.Context, ctrlclient client.Client, clusterName client.ObjectKey, owner metav1.OwnerReference) error
 }
 
+// Certificate is representing common operations on certificate rereival from the cluster.
 type Certificate interface {
 	GetPurpose() Purpose
 	GetKeyPair() *certs.KeyPair
-	SetKeyPair(*certs.KeyPair)
-	Lookup(context.Context, client.Reader, client.ObjectKey) (*corev1.Secret, error)
+	SetKeyPair(keyPair *certs.KeyPair)
+	Lookup(ctx context.Context, cl client.Reader, key client.ObjectKey) (*corev1.Secret, error)
 	Generate() error
 	IsGenerated() bool
 	IsExternal() bool
@@ -122,7 +124,7 @@ func (c *ManagedCertificate) Lookup(ctx context.Context, ctrlclient client.Reade
 				return nil, errors.WithMessage(err, "external certificate not found")
 			}
 
-			return nil, nil
+			return nil, nil //nolint:nilnil
 		}
 
 		return nil, errors.WithStack(err)
@@ -139,9 +141,11 @@ type ExternalCertificate struct {
 	KeyPair   *certs.KeyPair
 }
 
-var _ CertificatesGenerator = &Certificates{}
-var _ Certificate = &ManagedCertificate{}
-var _ Certificate = &ExternalCertificate{}
+var (
+	_ CertificatesGenerator = &Certificates{}
+	_ Certificate           = &ManagedCertificate{}
+	_ Certificate           = &ExternalCertificate{}
+)
 
 // Certificates are the certificates necessary to bootstrap a cluster.
 type Certificates []Certificate
@@ -222,28 +226,33 @@ func (c *ManagedCertificate) Generate() error {
 	return nil
 }
 
+// GetPurpose returns the assigned purpose for the certificate.
 func (c *ManagedCertificate) GetPurpose() Purpose {
 	return c.Purpose
 }
 
+// GetKeyPair gets the certificate key pair.
 func (c *ManagedCertificate) GetKeyPair() *certs.KeyPair {
 	return c.KeyPair
 }
 
+// SetKeyPair sets the certificate key pair.
 func (c *ManagedCertificate) SetKeyPair(keyPair *certs.KeyPair) {
 	c.KeyPair = keyPair
 }
 
+// IsGenerated returns if this time the certificate was newly generated, opposed to being fetched from cache.
 func (c *ManagedCertificate) IsGenerated() bool {
 	return c.Generated
 }
 
+// IsExternal returns true for extenally managed cerificates.
 func (c *ManagedCertificate) IsExternal() bool {
 	return c.External
 }
 
 // Lookup implements certificate lookup for external source.
-func (c *ExternalCertificate) Lookup(ctx context.Context, _ client.Reader, clusterName client.ObjectKey) (*corev1.Secret, error) {
+func (c *ExternalCertificate) Lookup(ctx context.Context, _ client.Reader, _ client.ObjectKey) (*corev1.Secret, error) {
 	s := &corev1.Secret{}
 	key := client.ObjectKey{
 		Name:      Name("cluster", c.GetPurpose()),
@@ -256,7 +265,7 @@ func (c *ExternalCertificate) Lookup(ctx context.Context, _ client.Reader, clust
 				return nil, errors.WithMessage(err, "external certificate not found")
 			}
 
-			return nil, nil
+			return nil, nil //nolint:nilnil
 		}
 
 		return nil, errors.WithStack(err)
@@ -529,7 +538,7 @@ func generateServiceAccountKeys() (*certs.KeyPair, error) {
 	}, nil
 }
 
-func asSecret(data map[string][]byte, purpose Purpose, clusterName types.NamespacedName, owner metav1.OwnerReference) *corev1.Secret {
+func asSecret(data map[string][]byte, purpose Purpose, clusterName types.NamespacedName, _ metav1.OwnerReference) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: clusterName.Namespace,

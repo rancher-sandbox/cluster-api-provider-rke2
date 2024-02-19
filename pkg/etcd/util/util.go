@@ -20,8 +20,9 @@ package util
 import (
 	"strings"
 
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/etcd"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/etcd"
 )
 
 // MemberForName returns the etcd member with the matching name.
@@ -31,6 +32,7 @@ func MemberForName(members []*etcd.Member, name string) *etcd.Member {
 			return m
 		}
 	}
+
 	return nil
 }
 
@@ -40,6 +42,7 @@ func MemberNames(members []*etcd.Member) []string {
 	for _, m := range members {
 		names = append(names, m.Name)
 	}
+
 	return names
 }
 
@@ -50,5 +53,6 @@ func MemberNames(members []*etcd.Member) []string {
 func MemberEqual(members1, members2 []*etcd.Member) bool {
 	names1 := sets.Set[string]{}.Insert(MemberNames(members1)...)
 	names2 := sets.Set[string]{}.Insert(MemberNames(members2)...)
+
 	return names1.Equal(names2)
 }

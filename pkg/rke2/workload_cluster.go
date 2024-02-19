@@ -31,7 +31,6 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -48,6 +47,10 @@ import (
 
 const (
 	labelNodeRoleControlPlane = "node-role.kubernetes.io/master"
+	remoteEtcdTimeout         = 30 * time.Second
+	etcdDialTimeout           = 10 * time.Second
+	etcdCallTimeout           = 15 * time.Second
+	minimalNodeCount          = 2
 )
 
 // ErrControlPlaneMinNodes is returned when the control plane has fewer than 2 nodes.
@@ -75,15 +78,20 @@ type WorkloadCluster interface {
 
 // Workload defines operations on workload clusters.
 type Workload struct {
-	client.Client
+	ctrlclient.Client
 
 	Nodes               map[string]*corev1.Node
 	nodePatchHelpers    map[string]*patch.Helper
-	etcdClientGenerator etcd.EtcdClientFor
+	etcdClientGenerator etcd.ClientFor
 }
 
 // NewWorkload is creating a new ClusterWorkload instance.
-func (m *Management) NewWorkload(ctx context.Context, cl client.Client, restConfig *rest.Config, clusterKey ctrlclient.ObjectKey) (*Workload, error) {
+func (m *Management) NewWorkload(
+	ctx context.Context,
+	cl ctrlclient.Client,
+	restConfig *rest.Config,
+	clusterKey ctrlclient.ObjectKey,
+) (*Workload, error) {
 	workload := &Workload{
 		Client:           cl,
 		Nodes:            map[string]*corev1.Node{},
@@ -91,19 +99,20 @@ func (m *Management) NewWorkload(ctx context.Context, cl client.Client, restConf
 	}
 
 	restConfig = rest.CopyConfig(restConfig)
-	restConfig.Timeout = 30 * time.Second
+	restConfig.Timeout = remoteEtcdTimeout
 
 	// Retrieves the etcd CA key Pair
 	keyPair, err := m.getEtcdCAKeyPair(ctx, clusterKey)
-	if client.IgnoreNotFound(err) != nil {
+	if ctrlclient.IgnoreNotFound(err) != nil {
 		return nil, err
 	} else if apierrors.IsNotFound(err) || keyPair == nil {
 		keyPair, err = m.getRemoteKeyPair(ctx, cl, clusterKey)
-		if client.IgnoreNotFound(err) != nil {
+		if ctrlclient.IgnoreNotFound(err) != nil {
 			return nil, err
 		} else if keyPair == nil {
-			log.FromContext(ctx).Info("Cluster does not provide etcd certificates for creating child etcd client." +
+			log.FromContext(ctx).Info("Cluster does not provide etcd certificates for creating child etcd ctrlclient." +
 				"Please scale up the CP nodes by one to bootstrap the etcd secret content.")
+
 			return workload, nil
 		}
 	}
@@ -116,12 +125,12 @@ func (m *Management) NewWorkload(ctx context.Context, cl client.Client, restConf
 	caPool := x509.NewCertPool()
 	caPool.AppendCertsFromPEM(keyPair.Cert)
 	tlsConfig := &tls.Config{
-		RootCAs:            caPool,
-		Certificates:       []tls.Certificate{clientCert},
-		MinVersion:         tls.VersionTLS12,
-		InsecureSkipVerify: true,
+		RootCAs:      caPool,
+		Certificates: []tls.Certificate{clientCert},
+		MinVersion:   tls.VersionTLS12,
 	}
-	workload.etcdClientGenerator = etcd.NewEtcdClientGenerator(restConfig, tlsConfig, 10*time.Second, 15*time.Second)
+	tlsConfig.InsecureSkipVerify = true
+	workload.etcdClientGenerator = etcd.NewClientGenerator(restConfig, tlsConfig, etcdDialTimeout, etcdCallTimeout)
 
 	return workload, nil
 }
@@ -174,7 +183,7 @@ func (w *Workload) getControlPlaneNodes(ctx context.Context) (*corev1.NodeList, 
 		labelNodeRoleControlPlane: "true",
 	}
 
-	if err := w.Client.List(ctx, nodes, client.MatchingLabels(labels)); err != nil {
+	if err := w.Client.List(ctx, nodes, ctrlclient.MatchingLabels(labels)); err != nil {
 		return nil, err
 	}
 

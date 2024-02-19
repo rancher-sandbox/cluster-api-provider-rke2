@@ -18,9 +18,9 @@ package proxy
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -62,18 +62,23 @@ func NewDialer(p Proxy, options ...func(*Dialer) error) (*Dialer, error) {
 	if dialer.timeout == 0 {
 		dialer.timeout = defaultTimeout
 	}
+
 	p.KubeConfig.Timeout = dialer.timeout
+
 	clientset, err := kubernetes.NewForConfig(p.KubeConfig)
 	if err != nil {
 		return nil, err
 	}
+
 	proxyTransport, upgrader, err := spdy.RoundTripperFor(p.KubeConfig)
 	if err != nil {
 		return nil, err
 	}
+
 	dialer.proxyTransport = proxyTransport
 	dialer.upgrader = upgrader
 	dialer.clientset = clientset
+
 	return dialer, nil
 }
 
@@ -106,13 +111,14 @@ func (d *Dialer) DialContext(_ context.Context, _ string, addr string) (net.Conn
 	headers := http.Header{}
 
 	// Set the header port number to match the proxy one.
-	headers.Set(corev1.PortHeader, fmt.Sprintf("%d", d.proxy.Port))
+	headers.Set(corev1.PortHeader, strconv.Itoa(d.proxy.Port))
 
 	// We only create a single stream over the connection
 	headers.Set(corev1.PortForwardRequestIDHeader, "0")
 
 	// Create the error stream.
 	headers.Set(corev1.StreamType, corev1.StreamTypeError)
+
 	errorStream, err := connection.CreateStream(headers)
 	if err != nil {
 		return nil, kerrors.NewAggregate([]error{
@@ -133,6 +139,7 @@ func (d *Dialer) DialContext(_ context.Context, _ string, addr string) (net.Conn
 	// NOTE: Given that we're reusing the headers,
 	// we need to overwrite the stream type before creating it.
 	headers.Set(corev1.StreamType, corev1.StreamTypeData)
+
 	dataStream, err := connection.CreateStream(headers)
 	if err != nil {
 		return nil, kerrors.NewAggregate([]error{
@@ -154,5 +161,6 @@ func DialTimeout(duration time.Duration) func(*Dialer) error {
 
 func (d *Dialer) setTimeout(duration time.Duration) error {
 	d.timeout = duration
+
 	return nil
 }

@@ -52,9 +52,8 @@ import (
 )
 
 var (
-	scheme         = runtime.NewScheme()
-	setupLog       = ctrl.Log.WithName("setup")
-	controllerName = "cluster-api-rke2-control-plane-manager"
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
 
 	// flags.
 	metricsBindAddr             string
