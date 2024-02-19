@@ -31,7 +31,7 @@ import (
 )
 
 // ReconcileEtcdMembers iterates over all etcd members and finds members that do not have corresponding nodes.
-// If there are any such members, it deletes them from etcd and removes their nodes from the kubeadm configmap so that kubeadm does not run etcd health checks on them.
+// If there are any such members, it deletes them from etcd so that etcd does not run etcd health checks on them.
 func (w *Workload) ReconcileEtcdMembers(ctx context.Context, nodeNames []string, version semver.Version) ([]string, error) {
 	allRemovedMembers := []string{}
 	allErrs := []error{}
@@ -102,6 +102,10 @@ func (w *Workload) removeMemberForNode(ctx context.Context, name string) error {
 	if len(controlPlaneNodes.Items) < 2 {
 		return ErrControlPlaneMinNodes
 	}
+	// Return early for clusters without an etcd certificate secret
+	if w.etcdClientGenerator == nil {
+		return nil
+	}
 
 	// Exclude node being removed from etcd client node list
 	var remainingNodes []string
@@ -147,6 +151,11 @@ func (w *Workload) ForwardEtcdLeadership(ctx context.Context, machine *clusterv1
 	}
 	if leaderCandidate.Status.NodeRef == nil {
 		return errors.New("leader has no node reference")
+	}
+
+	// Return early for clusters without an etcd certificate secret
+	if w.etcdClientGenerator == nil {
+		return nil
 	}
 
 	nodes, err := w.getControlPlaneNodes(ctx)
@@ -200,6 +209,10 @@ type EtcdMemberStatus struct {
 // but then it relies on etcd as ultimate source of truth for the list of members.
 // This is intended to allow informed decisions on actions impacting etcd quorum.
 func (w *Workload) EtcdMembers(ctx context.Context) ([]string, error) {
+	// Return early for clusters without an etcd certificate secret
+	if w.etcdClientGenerator == nil {
+		return []string{}, nil
+	}
 	nodes, err := w.getControlPlaneNodes(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list control plane nodes")

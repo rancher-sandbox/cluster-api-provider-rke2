@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util"
@@ -82,11 +83,13 @@ type Workload struct {
 }
 
 // NewWorkload is creating a new ClusterWorkload instance.
-func (m *Management) NewWorkload(ctx context.Context, cl client.Client, clusterKey ctrlclient.ObjectKey) (*Workload, error) {
-	restConfig, err := m.Tracker.GetRESTConfig(ctx, clusterKey)
-	if err != nil {
-		return nil, &RemoteClusterConnectionError{Name: clusterKey.String(), Err: err}
+func (m *Management) NewWorkload(ctx context.Context, cl client.Client, restConfig *rest.Config, clusterKey ctrlclient.ObjectKey) (*Workload, error) {
+	workload := &Workload{
+		Client:           cl,
+		Nodes:            map[string]*corev1.Node{},
+		nodePatchHelpers: map[string]*patch.Helper{},
 	}
+
 	restConfig = rest.CopyConfig(restConfig)
 	restConfig.Timeout = 30 * time.Second
 
@@ -95,13 +98,14 @@ func (m *Management) NewWorkload(ctx context.Context, cl client.Client, clusterK
 	if client.IgnoreNotFound(err) != nil {
 		return nil, err
 	} else if apierrors.IsNotFound(err) || keyPair == nil {
-		keyPair, err = m.getRemoteKeyPair(ctx, clusterKey)
-		if err != nil {
+		keyPair, err = m.getRemoteKeyPair(ctx, cl, clusterKey)
+		if client.IgnoreNotFound(err) != nil {
 			return nil, err
+		} else if keyPair == nil {
+			log.FromContext(ctx).Info("Cluster does not provide etcd certificates for creating child etcd client." +
+				"Please scale up the CP nodes by one to bootstrap the etcd secret content.")
+			return workload, nil
 		}
-	}
-	if keyPair.Cert == nil && err == nil {
-		panic(1)
 	}
 
 	clientCert, err := tls.X509KeyPair(keyPair.Cert, keyPair.Key)
@@ -117,13 +121,9 @@ func (m *Management) NewWorkload(ctx context.Context, cl client.Client, clusterK
 		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: true,
 	}
+	workload.etcdClientGenerator = etcd.NewEtcdClientGenerator(restConfig, tlsConfig, 10*time.Second, 15*time.Second)
 
-	return &Workload{
-		Client:              cl,
-		Nodes:               map[string]*corev1.Node{},
-		nodePatchHelpers:    map[string]*patch.Helper{},
-		etcdClientGenerator: etcd.NewEtcdClientGenerator(restConfig, tlsConfig, 10*time.Second, 15*time.Second),
-	}, nil
+	return workload, nil
 }
 
 // InitWorkload prepares workload for evaluating status conditions.

@@ -119,7 +119,7 @@ func (m *Management) GetWorkloadCluster(ctx context.Context, clusterKey ctrlclie
 		return nil, &RemoteClusterConnectionError{Name: clusterKey.String(), Err: err}
 	}
 
-	return m.NewWorkload(ctx, c, clusterKey)
+	return m.NewWorkload(ctx, c, restConfig, clusterKey)
 }
 
 func (m *Management) getEtcdCAKeyPair(ctx context.Context, clusterKey client.ObjectKey) (*certs.KeyPair, error) {
@@ -137,11 +137,7 @@ func (m *Management) getEtcdCAKeyPair(ctx context.Context, clusterKey client.Obj
 	return etcd.KeyPair, nil
 }
 
-func (m *Management) getRemoteKeyPair(ctx context.Context, clusterKey client.ObjectKey) (*certs.KeyPair, error) {
-	remoteClient, err := m.Tracker.GetClient(ctx, clusterKey)
-	if err != nil {
-		return nil, &RemoteClusterConnectionError{Name: clusterKey.String(), Err: err}
-	}
+func (m *Management) getRemoteKeyPair(ctx context.Context, remoteClient client.Client, clusterKey client.ObjectKey) (*certs.KeyPair, error) {
 	etcdCertificate := &secret.ExternalCertificate{
 		Reader:  remoteClient,
 		Purpose: secret.EtcdCA,

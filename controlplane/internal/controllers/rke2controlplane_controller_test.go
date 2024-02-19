@@ -230,7 +230,7 @@ var _ = Describe("Reconclie control plane conditions", func() {
 		r := &RKE2ControlPlaneReconciler{
 			Client:                    testEnv.GetClient(),
 			Scheme:                    testEnv.GetScheme(),
-			managementCluster:         &rke2.Management{Client: testEnv.GetClient()},
+			managementCluster:         &rke2.Management{Client: testEnv.GetClient(), SecretCachingClient: testEnv.GetClient()},
 			managementClusterUncached: &rke2.Management{Client: testEnv.GetClient()},
 		}
 		_, err := r.reconcileControlPlaneConditions(ctx, cp)
