@@ -19,8 +19,8 @@ import (
 	"fmt"
 
 	bootstrapv1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1beta1"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/internal/cloudinit"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/internal/ignition/butane"
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/cloudinit"
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/ignition/butane"
 )
 
 const (

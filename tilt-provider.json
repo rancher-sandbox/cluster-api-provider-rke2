@@ -9,7 +9,8 @@
           "go.mod",
           "go.sum",
           "api",
-          "internal",
+          "controllers",
+          "webhooks",
           "pkg",
           "../pkg"
         ],
@@ -27,7 +28,9 @@
             "go.mod",
             "go.sum",
             "api",
-            "internal",
+            "cloudinit",
+            "controllers",
+            "ignition",
             "pkg",
             "../pkg"
           ],

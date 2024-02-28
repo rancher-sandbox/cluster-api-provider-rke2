@@ -30,7 +30,7 @@ import (
 	"github.com/pkg/errors"
 
 	bootstrapv1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1beta1"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/internal/cloudinit"
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/cloudinit"
 )
 
 // The template contains configurations for two main sections: systemd units and storage files.

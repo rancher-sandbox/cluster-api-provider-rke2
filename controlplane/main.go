@@ -47,7 +47,7 @@ import (
 	bootstrapv1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1beta1"
 	controlplanev1alpha1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1alpha1"
 	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1beta1"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/internal/controllers"
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/controllers"
 	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/consts"
 )
 

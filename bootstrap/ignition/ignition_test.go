@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	bootstrapv1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1beta1"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/internal/cloudinit"
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/cloudinit"
 )
 
 func TestIgnition(t *testing.T) {

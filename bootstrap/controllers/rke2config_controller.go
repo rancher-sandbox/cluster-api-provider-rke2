@@ -42,8 +42,8 @@ import (
 	"sigs.k8s.io/cluster-api/util/patch"
 
 	bootstrapv1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1beta1"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/internal/cloudinit"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/internal/ignition"
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/cloudinit"
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/ignition"
 	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1beta1"
 	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/consts"
 	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/locking"

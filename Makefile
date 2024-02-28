@@ -157,7 +157,7 @@ generate-manifests-rke2-bootstrap: $(CONTROLLER_GEN) ## Generate manifests e.g. 
 	$(MAKE) clean-generated-yaml SRC_DIRS="./bootstrap/config/crd/bases"
 	$(CONTROLLER_GEN) \
 		paths=./bootstrap/api/... \
-		paths=./bootstrap/internal/controllers/... \
+		paths=./bootstrap/controllers/... \
 		crd:crdVersions=v1 \
 		rbac:roleName=manager-role \
 		output:crd:dir=./bootstrap/config/crd/bases \
@@ -170,8 +170,8 @@ generate-manifests-rke2-control-plane: $(CONTROLLER_GEN) ## Generate manifests e
 	$(MAKE) clean-generated-yaml SRC_DIRS="./controlplane/config/crd/bases"
 	$(CONTROLLER_GEN) \
 		paths=./controlplane/api/... \
-		paths=./controlplane/internal/controllers/... \
-		paths=./controlplane/internal/webhooks/... \
+		paths=./controlplane/controllers/... \
+		paths=./controlplane/webhooks/... \
 		crd:crdVersions=v1 \
 		rbac:roleName=manager-role \
 		output:crd:dir=./controlplane/config/crd/bases \
