@@ -71,10 +71,10 @@ With CAPI & clusterctl versions less than v1.6.0 you need a specific configurati
 ```yaml
 providers:
   - name: "rke2"
-    url: "https://github.com/rancher-sandbox/cluster-api-provider-rke2/releases/v0.1.1/bootstrap-components.yaml"
+    url: "https://github.com/rancher-sandbox/cluster-api-provider-rke2/releases/download/v0.2.6/bootstrap-components.yaml"
     type: "BootstrapProvider"
   - name: "rke2"
-    url: "https://github.com/rancher-sandbox/cluster-api-provider-rke2/releases/v0.1.1/control-plane-components.yaml"
+    url: "[https://github.com/rancher-sandbox/cluster-api-provider-rke2/releases/download/v0.2.6/control-plane-components.yaml"
     type: "ControlPlaneProvider"
 ``` 
 > NOTE: Due to some issue related to how `CAPD` creates Load Balancer healthchecks, it is necessary to use a fork of `CAPD` by providing in the above configuration file the following :
