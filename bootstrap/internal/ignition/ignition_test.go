@@ -207,7 +207,7 @@ var _ = Describe("getControlPlaneRKE2Commands", func() {
 	It("should return slice of control plane commands", func() {
 		commands, err := getControlPlaneRKE2Commands(baseUserData)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(commands).To(HaveLen(8))
+		Expect(commands).To(HaveLen(9))
 		Expect(commands).To(ContainElements(fmt.Sprintf(controlPlaneCommand, baseUserData.RKE2Version), serverDeployCommands[0], serverDeployCommands[1]))
 	})
 
@@ -215,7 +215,7 @@ var _ = Describe("getControlPlaneRKE2Commands", func() {
 		baseUserData.AirGapped = true
 		commands, err := getControlPlaneRKE2Commands(baseUserData)
 		Expect(err).ToNot(HaveOccurred())
-		Expect(commands).To(HaveLen(8))
+		Expect(commands).To(HaveLen(9))
 		Expect(commands).To(ContainElements(airGappedControlPlaneCommand, serverDeployCommands[0], serverDeployCommands[1]))
 	})
 

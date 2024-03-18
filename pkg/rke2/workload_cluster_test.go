@@ -7,6 +7,7 @@ import (
 	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/collections"
 	"sigs.k8s.io/cluster-api/util/conditions"
@@ -118,7 +119,14 @@ var _ = Describe("Node metadata propagation", func() {
 			*machine,
 		}})
 
-		w := NewWorkload(testEnv.GetClient())
+		m := &Management{
+			Client:              testEnv,
+			SecretCachingClient: testEnv,
+		}
+
+		w, err := m.NewWorkload(ctx, testEnv.GetClient(), testEnv.GetConfig(), types.NamespacedName{})
+		Expect(err).ToNot(HaveOccurred())
+
 		cp, err := NewControlPlane(ctx, testEnv.GetClient(), nil, nil, machines)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(w.InitWorkload(ctx, cp)).ToNot(HaveOccurred())
@@ -142,7 +150,13 @@ var _ = Describe("Node metadata propagation", func() {
 			*machine,
 		}})
 
-		w := NewWorkload(testEnv.GetClient())
+		m := &Management{
+			Client:              testEnv,
+			SecretCachingClient: testEnv,
+		}
+
+		w, err := m.NewWorkload(ctx, testEnv.GetClient(), testEnv.GetConfig(), types.NamespacedName{})
+		Expect(err).ToNot(HaveOccurred())
 		cp, err := NewControlPlane(ctx, testEnv.GetClient(), nil, nil, machines)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(w.InitWorkload(ctx, cp)).ToNot(HaveOccurred())
@@ -166,7 +180,13 @@ var _ = Describe("Node metadata propagation", func() {
 			*machine,
 		}})
 
-		w := NewWorkload(testEnv.GetClient())
+		m := &Management{
+			Client:              testEnv,
+			SecretCachingClient: testEnv,
+		}
+
+		w, err := m.NewWorkload(ctx, testEnv.GetClient(), testEnv.GetConfig(), types.NamespacedName{})
+		Expect(err).ToNot(HaveOccurred())
 		cp, err := NewControlPlane(ctx, testEnv.GetClient(), nil, nil, machines)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(w.InitWorkload(ctx, cp)).ToNot(HaveOccurred())
@@ -207,7 +227,13 @@ var _ = Describe("Node metadata propagation", func() {
 			*machine,
 		}})
 
-		w := NewWorkload(testEnv.GetClient())
+		m := &Management{
+			Client:              testEnv,
+			SecretCachingClient: testEnv,
+		}
+
+		w, err := m.NewWorkload(ctx, testEnv.GetClient(), testEnv.GetConfig(), types.NamespacedName{})
+		Expect(err).ToNot(HaveOccurred())
 		cp, err := NewControlPlane(ctx, testEnv.GetClient(), nil, nil, machines)
 		Expect(w.InitWorkload(ctx, cp)).ToNot(HaveOccurred())
 		Expect(err).ToNot(HaveOccurred())
@@ -245,7 +271,13 @@ var _ = Describe("Node metadata propagation", func() {
 			*machineDifferentNode,
 		}})
 
-		w := NewWorkload(testEnv.GetClient())
+		m := &Management{
+			Client:              testEnv,
+			SecretCachingClient: testEnv,
+		}
+
+		w, err := m.NewWorkload(ctx, testEnv.GetClient(), testEnv.GetConfig(), types.NamespacedName{})
+		Expect(err).ToNot(HaveOccurred())
 		cp, err := NewControlPlane(ctx, testEnv.GetClient(), nil, nil, machines)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(w.InitWorkload(ctx, cp)).ToNot(HaveOccurred())
@@ -281,7 +313,13 @@ var _ = Describe("Node metadata propagation", func() {
 			*machineDifferentNode,
 		}})
 
-		w := NewWorkload(testEnv.GetClient())
+		m := &Management{
+			Client:              testEnv,
+			SecretCachingClient: testEnv,
+		}
+
+		w, err := m.NewWorkload(ctx, testEnv.GetClient(), testEnv.GetConfig(), types.NamespacedName{})
+		Expect(err).ToNot(HaveOccurred())
 		cp, err := NewControlPlane(ctx, testEnv.GetClient(), nil, nil, machines)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(w.InitWorkload(ctx, cp)).ToNot(HaveOccurred())

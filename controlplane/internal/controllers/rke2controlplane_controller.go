@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/blang/semver/v4"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -65,11 +66,15 @@ const (
 type RKE2ControlPlaneReconciler struct {
 	Log logr.Logger
 	client.Client
-	Scheme                    *runtime.Scheme
+	Scheme *runtime.Scheme
+
+	SecretCachingClient client.Client
+
 	managementClusterUncached rke2.ManagementCluster
 	managementCluster         rke2.ManagementCluster
 	recorder                  record.EventRecorder
 	controller                controller.Controller
+	workloadCluster           rke2.WorkloadCluster
 }
 
 //nolint:lll
@@ -235,11 +240,14 @@ func (r *RKE2ControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr c
 	r.recorder = mgr.GetEventRecorderFor("rke2-control-plane-controller")
 
 	if r.managementCluster == nil {
-		r.managementCluster = &rke2.Management{Client: r.Client}
+		r.managementCluster = &rke2.Management{
+			Client:              r.Client,
+			SecretCachingClient: r.SecretCachingClient,
+		}
 	}
 
 	if r.managementClusterUncached == nil {
-		r.managementClusterUncached = &rke2.Management{Client: mgr.GetAPIReader()}
+		r.managementClusterUncached = &rke2.Management{Client: mgr.GetClient()}
 	}
 
 	return nil
@@ -465,6 +473,12 @@ func (r *RKE2ControlPlaneReconciler) reconcileNormal(
 		return result, err
 	}
 
+	// Ensures the number of etcd members is in sync with the number of machines/nodes.
+	// NOTE: This is usually required after a machine deletion.
+	if err := r.reconcileEtcdMembers(ctx, controlPlane); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Control plane machines rollout due to configuration changes (e.g. upgrades) takes precedence over other operations.
 	needRollout := controlPlane.MachinesNeedingRollout()
 
@@ -519,6 +533,76 @@ func (r *RKE2ControlPlaneReconciler) reconcileNormal(
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// GetWorkloadCluster builds a cluster object.
+// The cluster comes with an etcd client generator to connect to any etcd pod living on a managed machine.
+func (r *RKE2ControlPlaneReconciler) GetWorkloadCluster(ctx context.Context, controlPlane *rke2.ControlPlane) (rke2.WorkloadCluster, error) {
+	if r.workloadCluster != nil {
+		return r.workloadCluster, nil
+	}
+
+	workloadCluster, err := r.managementCluster.GetWorkloadCluster(ctx, client.ObjectKeyFromObject(controlPlane.Cluster))
+	if err != nil {
+		return nil, err
+	}
+
+	r.workloadCluster = workloadCluster
+
+	return r.workloadCluster, nil
+}
+
+// reconcileEtcdMembers ensures the number of etcd members is in sync with the number of machines/nodes.
+// This is usually required after a machine deletion.
+//
+// NOTE: this func uses KCP conditions, it is required to call reconcileControlPlaneConditions before this.
+func (r *RKE2ControlPlaneReconciler) reconcileEtcdMembers(ctx context.Context, controlPlane *rke2.ControlPlane) error {
+	log := ctrl.LoggerFrom(ctx)
+
+	// If there is no KCP-owned control-plane machines, then control-plane has not been initialized yet.
+	if controlPlane.Machines.Len() == 0 {
+		return nil
+	}
+
+	// Collect all the node names.
+	nodeNames := []string{}
+
+	for _, machine := range controlPlane.Machines {
+		if machine.Status.NodeRef == nil {
+			// If there are provisioning machines (machines without a node yet), return.
+			return nil
+		}
+
+		nodeNames = append(nodeNames, machine.Status.NodeRef.Name)
+	}
+
+	// Potential inconsistencies between the list of members and the list of machines/nodes are
+	// surfaced using the EtcdClusterHealthyCondition; if this condition is true, meaning no inconsistencies exists, return early.
+	if conditions.IsTrue(controlPlane.RCP, controlplanev1.EtcdClusterHealthyCondition) {
+		return nil
+	}
+
+	workloadCluster, err := r.GetWorkloadCluster(ctx, controlPlane)
+	if err != nil {
+		// Failing at connecting to the workload cluster can mean workload cluster is unhealthy for a variety of reasons such as etcd quorum loss.
+		return errors.Wrap(err, "cannot get remote client to workload cluster")
+	}
+
+	parsedVersion, err := semver.ParseTolerant(controlPlane.RCP.Spec.AgentConfig.Version)
+	if err != nil {
+		return errors.Wrapf(err, "failed to parse kubernetes version %q", controlPlane.RCP.Spec.AgentConfig.Version)
+	}
+
+	removedMembers, err := workloadCluster.ReconcileEtcdMembers(ctx, nodeNames, parsedVersion)
+	if err != nil {
+		return errors.Wrap(err, "failed attempt to reconcile etcd members")
+	}
+
+	if len(removedMembers) > 0 {
+		log.Info("Etcd members without nodes removed from the cluster", "members", removedMembers)
+	}
+
+	return nil
 }
 
 func (r *RKE2ControlPlaneReconciler) reconcileDelete(ctx context.Context,

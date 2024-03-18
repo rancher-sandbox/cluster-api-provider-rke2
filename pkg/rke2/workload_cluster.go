@@ -18,14 +18,21 @@ package rke2
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/blang/semver/v4"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/client-go/rest"
+	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util"
@@ -35,10 +42,15 @@ import (
 	"sigs.k8s.io/cluster-api/util/patch"
 
 	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1beta1"
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/etcd"
 )
 
 const (
 	labelNodeRoleControlPlane = "node-role.kubernetes.io/master"
+	remoteEtcdTimeout         = 30 * time.Second
+	etcdDialTimeout           = 10 * time.Second
+	etcdCallTimeout           = 15 * time.Second
+	minimalNodeCount          = 2
 )
 
 // ErrControlPlaneMinNodes is returned when the control plane has fewer than 2 nodes.
@@ -55,30 +67,72 @@ type WorkloadCluster interface {
 	UpdateEtcdConditions(controlPlane *ControlPlane)
 	// Upgrade related tasks.
 
-	//	RemoveEtcdMemberForMachine(ctx context.Context, machine *clusterv1.Machine) error
-
-	//	ForwardEtcdLeadership(ctx context.Context, machine *clusterv1.Machine, leaderCandidate *clusterv1.Machine) error
 	//	AllowBootstrapTokensToGetNodes(ctx context.Context) error
 
 	// State recovery tasks.
-	//	ReconcileEtcdMembers(ctx context.Context, nodeNames []string) ([]string, error)
+	RemoveEtcdMemberForMachine(ctx context.Context, machine *clusterv1.Machine) error
+	ForwardEtcdLeadership(ctx context.Context, machine *clusterv1.Machine, leaderCandidate *clusterv1.Machine) error
+	ReconcileEtcdMembers(ctx context.Context, nodeNames []string, version semver.Version) ([]string, error)
+	EtcdMembers(ctx context.Context) ([]string, error)
 }
 
 // Workload defines operations on workload clusters.
 type Workload struct {
-	client.Client
+	ctrlclient.Client
 
-	Nodes            map[string]*corev1.Node
-	nodePatchHelpers map[string]*patch.Helper
+	Nodes               map[string]*corev1.Node
+	nodePatchHelpers    map[string]*patch.Helper
+	etcdClientGenerator etcd.ClientFor
 }
 
 // NewWorkload is creating a new ClusterWorkload instance.
-func NewWorkload(cl client.Client) *Workload {
-	return &Workload{
+func (m *Management) NewWorkload(
+	ctx context.Context,
+	cl ctrlclient.Client,
+	restConfig *rest.Config,
+	clusterKey ctrlclient.ObjectKey,
+) (*Workload, error) {
+	workload := &Workload{
 		Client:           cl,
 		Nodes:            map[string]*corev1.Node{},
 		nodePatchHelpers: map[string]*patch.Helper{},
 	}
+
+	restConfig = rest.CopyConfig(restConfig)
+	restConfig.Timeout = remoteEtcdTimeout
+
+	// Retrieves the etcd CA key Pair
+	keyPair, err := m.getEtcdCAKeyPair(ctx, clusterKey)
+	if ctrlclient.IgnoreNotFound(err) != nil {
+		return nil, err
+	} else if apierrors.IsNotFound(err) || keyPair == nil {
+		keyPair, err = m.getRemoteKeyPair(ctx, cl, clusterKey)
+		if ctrlclient.IgnoreNotFound(err) != nil {
+			return nil, err
+		} else if keyPair == nil {
+			log.FromContext(ctx).Info("Cluster does not provide etcd certificates for creating child etcd ctrlclient." +
+				"Please scale up the CP nodes by one to bootstrap the etcd secret content.")
+
+			return workload, nil
+		}
+	}
+
+	clientCert, err := tls.X509KeyPair(keyPair.Cert, keyPair.Key)
+	if err != nil {
+		return nil, err
+	}
+
+	caPool := x509.NewCertPool()
+	caPool.AppendCertsFromPEM(keyPair.Cert)
+	tlsConfig := &tls.Config{
+		RootCAs:      caPool,
+		Certificates: []tls.Certificate{clientCert},
+		MinVersion:   tls.VersionTLS12,
+	}
+	tlsConfig.InsecureSkipVerify = true
+	workload.etcdClientGenerator = etcd.NewClientGenerator(restConfig, tlsConfig, etcdDialTimeout, etcdCallTimeout)
+
+	return workload, nil
 }
 
 // InitWorkload prepares workload for evaluating status conditions.
@@ -129,7 +183,7 @@ func (w *Workload) getControlPlaneNodes(ctx context.Context) (*corev1.NodeList, 
 		labelNodeRoleControlPlane: "true",
 	}
 
-	if err := w.Client.List(ctx, nodes, client.MatchingLabels(labels)); err != nil {
+	if err := w.Client.List(ctx, nodes, ctrlclient.MatchingLabels(labels)); err != nil {
 		return nil, err
 	}
 

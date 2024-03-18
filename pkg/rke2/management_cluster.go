@@ -21,13 +21,17 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/controllers/remote"
+	"sigs.k8s.io/cluster-api/util/certs"
 	"sigs.k8s.io/cluster-api/util/collections"
+
+	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/secret"
 )
 
 const (
@@ -45,7 +49,9 @@ type ManagementCluster interface {
 
 // Management holds operations on the management cluster.
 type Management struct {
-	Client ctrlclient.Reader
+	Client              ctrlclient.Client
+	SecretCachingClient ctrlclient.Reader
+	Tracker             *remote.ClusterCacheTracker
 }
 
 // RemoteClusterConnectionError represents a failure to connect to a remote cluster.
@@ -113,5 +119,36 @@ func (m *Management) GetWorkloadCluster(ctx context.Context, clusterKey ctrlclie
 		return nil, &RemoteClusterConnectionError{Name: clusterKey.String(), Err: err}
 	}
 
-	return NewWorkload(c), nil
+	return m.NewWorkload(ctx, c, restConfig, clusterKey)
+}
+
+func (m *Management) getEtcdCAKeyPair(ctx context.Context, clusterKey ctrlclient.ObjectKey) (*certs.KeyPair, error) {
+	etcd := &secret.ManagedCertificate{
+		Purpose: secret.EtcdCA,
+	}
+
+	// Try to get the certificate via the cached ctrlclient.
+	s, err := etcd.Lookup(ctx, m.SecretCachingClient, clusterKey)
+	if err != nil || s == nil {
+		// Return error if we got an errors which is not a NotFound error.
+		return nil, errors.Wrapf(err, "failed to get secret; etcd CA bundle %s/%s", clusterKey.Namespace, secret.Name(clusterKey.Name, secret.EtcdCA))
+	}
+
+	return etcd.KeyPair, nil
+}
+
+func (m *Management) getRemoteKeyPair(ctx context.Context, remoteClient ctrlclient.Client, clusterKey ctrlclient.ObjectKey) (*certs.KeyPair, error) {
+	etcdCertificate := &secret.ExternalCertificate{
+		Reader:  remoteClient,
+		Purpose: secret.EtcdCA,
+	}
+	externalCertificates := secret.Certificates{etcdCertificate}
+
+	if err := externalCertificates.LookupOrGenerate(ctx, m.Client, clusterKey, metav1.OwnerReference{}); err != nil {
+		log.FromContext(ctx).Error(err, "unable to lookup or create cluster certificates")
+
+		return nil, err
+	}
+
+	return etcdCertificate.KeyPair, nil
 }
