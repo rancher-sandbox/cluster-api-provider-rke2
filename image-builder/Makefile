@@ -16,7 +16,6 @@
 
 .DEFAULT_GOAL := help
 
-CONTAINERD_VERSION?=1.5.9
 RKE2_VERSION?=1.26.0+rke2r1
 
 ## --------------------------------------
@@ -56,7 +55,7 @@ endif
 ## Platform and version combinations
 ## --------------------------------------
 
-AWS_BUILD_NAMES ?= aws-opensuse-1504 aws-ubuntu-2204
+AWS_BUILD_NAMES ?= aws-opensuse-leap-155
 
 ## --------------------------------------
 ## Dynamic build targets
@@ -66,12 +65,11 @@ AWS_BUILD_TARGETS := $(addprefix build-,$(AWS_BUILD_NAMES))
 
 .PHONY: $(AWS_BUILD_TARGETS)
 $(AWS_BUILD_TARGETS):
-	packer build $(PACKER_FLAGS) -var-file="$(abspath aws/$(subst build-aws-,,$@).json)" -var "containerd_version=$(CONTAINERD_VERSION)" -var "rke2_semver=$(RKE2_VERSION)" aws/packer.json
+	packer build $(PACKER_FLAGS) -var-file="$(abspath aws/$(subst build-aws-,,$@).json)" -var "rke2_semver=$(RKE2_VERSION)" aws/packer.json
 
 ## --------------------------------------
 ## Document dynamic build targets
 ## --------------------------------------
 ##@ Builds
-build-aws-opensuse-1504: ## Builds an AMI for OpenSUSE 15.04
-build-aws-ubuntu-2204: ## Builds an AMI for Ubuntu 22.04
+build-aws-opensuse-leap-155: ## Builds an AMI for OpenSUSE Leap 15.5
 build-aws-all: $(AWS_BUILD_TARGETS) ## Builds all AMIs

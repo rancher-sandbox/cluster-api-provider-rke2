@@ -1,125 +1,56 @@
 # Using CAPI Provider RKE2 with AWS
 This README focuses on using the RKE2 provider with the AWS Infrastructure provider.
 
-> NOTE: There is a known issue related to using RKE2 with AWS, which is related to security groups and the fact that RKE2 needs a specific port to be open to make node registration. The issue is documented [here](https://github.com/kubernetes-sigs/cluster-api-provider-aws/issues/392#issuecomment-1386975735) in the AWS Provider repo. However, as a temporary solution, you will need to use a [fork of the AWS Provider](https://github.com/belgaied2/cluster-api-provider-aws). 
-
 ## Setting up the Management Cluster
 Make sure your set up a Management Cluster to use with Cluster API, example [here in the main README](https://github.com/rancher-sandbox/cluster-api-provider-rke2#management-cluster).
 
-## Configuring `clusterctl` 
-In order to use `clusterctl` to deploy an RKE2 cluster on AWS, you will need to configure the tool accordingly. First, make sure you have a folder `$HOME/.cluster-api`. Then, create (if it does not yet exist) a file called `clusterctl.yaml` inside that folder and edit it:
+## Deploying the Cluster API AWS Infrastructure Provider
 
-```bash 
-vim ~/.cluster-api/clusterctl.yaml
-```
-
-And put the following configuration:
-```yaml
-providers:
-  - name: "rke2"
-    url: "https://github.com/rancher-sandbox/cluster-api-provider-rke2/releases/v0.1.0-alpha.1/bootstrap-components.yaml"
-    type: "BootstrapProvider"
-  - name: "rke2"
-    url: "https://github.com/rancher-sandbox/cluster-api-provider-rke2/releases/v0.1.0-alpha.1/control-plane-components.yaml"
-    type: "ControlPlaneProvider"
-  - name: "aws"
-    url: "https://github.com/belgaied2/cluster-api-provider-aws/releases/v2.0.2-cabpr-fix/infrastructure-components.yaml"
-    type: "InfrastructureProvider"
-```
-
-The third provider configuration above is the one necessary to use the valid fork of the AWS Provider. This will need to be done until the issue with Security Groups is solved.
+Refer to the [Cluster API book](https://cluster-api.sigs.k8s.io/user/quick-start#initialization-for-common-providers) for configuring AWS credentials and setting up the AWS infrastructure provider.
 
 The next step is to run the clusterctl init command (make sure to provide valid AWS Credential using the `AWS_B64ENCODED_CREDENTIALS` environment variable):
 
-```bash
-export AWS_B64ENCODED_CREDENTIALS=<PUT_HERE_YOUR_BASE64_ENCODED_AWS_CREDENTIALS>
-```
-
-For the AWS external Cloud Provider, you will also need to set the ResourceSet experimental feature flag for CAPI:
+CAPRKE2 can also be deployed with `clusterctl`
 
 ```bash
-export EXP_CLUSTER_RESOURCE_SET=true
-```
-
-Then: 
-
-```bash
-clusterctl init --bootstrap rke2 --control-plane rke2 --infrastructure aws:v2.0.2-cabpr-fix
-```
-
-
-This should output something similar to the following:
-
-```
-Fetching providers
-Installing cert-manager Version="v1.10.1"
-Waiting for cert-manager to be available...
-Installing Provider="cluster-api" Version="v1.3.3" TargetNamespace="capi-system"
-Installing Provider="bootstrap-rke2" Version="v0.1.0-alpha.1" TargetNamespace="rke2-bootstrap-system"
-Installing Provider="control-plane-rke2" Version="v0.1.0-alpha.1" TargetNamespace="rke2-control-plane-system"
-Installing Provider="infrastructure-aws" Version="v2.0.2-cabpr-fix" TargetNamespace="capa-system"
-
-Your management cluster has been initialized successfully!
-
-You can now create your first workload cluster by running the following:
-
-  clusterctl generate cluster [name] --kubernetes-version [version] | kubectl apply -f -
+clusterctl init --bootstrap rke2 --control-plane rke2 --infrastructure aws
 ```
 
 ## Create a workload cluster
+
+Before creating a workload clusters, it is required to build an AMI for the RKE2 version that is going to be installed on the cluster. You can follow the steps in the [image-builder README](../../image-builder/README.md#aws) to build the AMI.
+
 The `internal` folder contains cluster templates to deploy an RKE2 cluster on AWS using the internal cloud provider (is DEPRECATED in favor of the external one), and the `external` folder contains the cluster templates to deploy a cluster with the external cloud provider.
 
-We will use the `external` one for this guide.
+**Note**: `external` template is currently outdated.
+
+We will use the `internal` one for this guide.
 
 You will need to set the following environment variables:
-- CABPR_CP_REPLICAS
-- CABPR_WK_REPLICAS
-- KUBERNETES_VERSION
-- AWS_NODE_MACHINE_TYPE
-- AWS_CONTROL_PLANE_MACHINE_TYPE
-- AWS_SSH_KEY_NAME
-- AWS_REGION
-
-Example:
 
 ```bash
+export CLUSTER_NAMESPACE="cluster-namespace"
+export CLUSTER_NAME="cluster-name"
 export CABPR_CP_REPLICAS=3
-export CABPR_WK_REPLICAS=2
-export KUBERNETES_VERSION=v1.24.6
+export CABPR_WK_REPLICAS=1
+export RKE2_VERSION=v1.26.0+rke2r1
 export AWS_NODE_MACHINE_TYPE=t3a.large
 export AWS_CONTROL_PLANE_MACHINE_TYPE=t3a.large 
-export AWS_SSH_KEY_NAME=<YOUR_AWS_PUBLIC_KEY_NAME>
-export AWS_REGION=<YOUR_AWS_REGION>
+export AWS_SSH_KEY_NAME="aws-ssh-key"
+export AWS_REGION="aws-region"
+export AWS_AMI_ID="ami-id"
 ```
 
 Now, we can generate the YAML files from the templates using `clusterctl generate yaml` command:
 
 ```bash
-clusterctl generate cluster --from https://github.com/rancher-sandbox/cluster-api-provider-rke2/blob/v0.1.0-alpha.1/samples/aws/external/cluster-template-external-cloud-provider.yaml -n example-aws rke2-aws > aws-rke2-clusterctl.yaml
+clusterctl generate cluster --from https://github.com/rancher-sandbox/cluster-api-provider-rke2/blob/main/samples/aws/internal/cluster-template.yaml -n example-aws rke2-aws > aws-rke2-clusterctl.yaml
 ```
 
 After examining the result YAML file, you can apply to the management cluster using :
 
 ```bash
 kubectl apply -f aws-rke2-clusterctl.yaml
-```
-
-You should see the following output:
-
-```
-namespace/example-aws created
-cluster.cluster.x-k8s.io/rke2-aws created
-awscluster.infrastructure.cluster.x-k8s.io/rke2-aws created
-rke2controlplane.controlplane.cluster.x-k8s.io/rke2-aws-control-plane created
-awsmachinetemplate.infrastructure.cluster.x-k8s.io/rke2-aws-control-plane created
-machinedeployment.cluster.x-k8s.io/rke2-aws-md-0 created
-awsmachinetemplate.infrastructure.cluster.x-k8s.io/rke2-aws-md-0 created
-rke2configtemplate.bootstrap.cluster.x-k8s.io/rke2-aws-md-0 created
-clusterresourceset.addons.cluster.x-k8s.io/crs-ccm created
-clusterresourceset.addons.cluster.x-k8s.io/crs-csi created
-configmap/cloud-controller-manager-addon created
-configmap/aws-ebs-csi-driver-addon created
-awsclustercontrolleridentity.infrastructure.cluster.x-k8s.io/default created
 ```
 
 ## Checking the workload cluster
@@ -143,6 +74,8 @@ Cluster/rke2-aws                                              True              
 ```
 
 ## Ignition based bootstrap
+
+**Note**: `ignition` template is currently outdated.
 
 Make sure that `BootstrapFormatIgnition` feature gate is enable for CAPA manager, you can do it
 by changing flag in the CAPA manager deployment:

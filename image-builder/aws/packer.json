@@ -3,7 +3,6 @@
         {
             "access_key": "{{user `aws_access_key`}}",
             "ami_description": "{{user `ami_description`}}",
-            "ami_groups": "{{user `ami_groups`}}",
             "ami_name": "capa-ami-{{user `build_name`}}-{{user `rke2_semver` | clean_resource_name}}-{{user `build_timestamp`}}",
             "ami_product_codes": "",
             "ami_regions": "{{user `ami_regions`}}",
@@ -29,7 +28,6 @@
             "security_group_ids": "{{user `aws_security_group_ids`}}",
             "skip_create_ami": "{{ user `skip_create_ami`}}",
             "skip_profile_validation": "{{user `skip_profile_validation`}}",
-            "snapshot_groups": "{{user `snapshot_groups`}}",
             "snapshot_users": "{{user `snapshot_users`}}",
             "source_ami": "{{user `source_ami`}}",
             "source_ami_filter": {
@@ -43,16 +41,15 @@
                 "owners": "{{user `ami_filter_owners`}}"
             },
             "ssh_keypair_name": "{{user `ssh_keypair_name`}}",
+            "ssh_private_key_file": "{{user `ssh_private_key_file`}}",
             "ssh_username": "{{user `ssh_username`}}",
             "subnet_id": "{{ user `subnet_id` }}",
             "tags": {
                 "build_date": "{{isotime}}",
                 "build_timestamp": "{{user `build_timestamp`}}",
-                "containerd_version": "{{user `containerd_version`}}",
                 "distribution": "{{user `distribution`}}",
                 "distribution_release": "{{user `distribution_release`}}",
                 "distribution_version": "{{user `distribution_version`}}",
-                "kubernetes_cni_version": "{{user `kubernetes_cni_semver`}}",
                 "kubernetes_version": "{{user `rke2_semver`}}",
                 "source_ami": "{{user `source_ami`}}"
             },
@@ -66,38 +63,39 @@
     "provisioners": [
         {
             "type": "file",
+            "source": "./files/features.py",
+            "destination": "/tmp/features.py"
+        },
+        {
+            "type": "file",
             "source": "{{ user `bootstrap_script_path` }}",
             "destination": "~/bootstrap.sh"
         },
         {
             "environment_vars": [
-                "BUILD_NAME={{user `build_name`}}",
-                "CONTAINERD_VERSION={{user `containerd_version`}}",
-                "ARCH=amd64",
-                "RKE2_VERSION={{user `rke2_semver`}}"
+                "RKE2_VERSION={{user `rke2_semver`}}",
+                "INFRA=aws"
             ],
             "type": "shell",
             "remote_folder": "~",
             "inline": [
-                "sudo bash ~/bootstrap.sh $CONTAINERD_VERSION $ARCH $RKE2_VERSION",
+                "sudo bash ~/bootstrap.sh $RKE2_VERSION $INFRA",
                 "rm ~/bootstrap.sh"
             ]
         }
     ],
     "variables": {
         "ami_description": "Cluster API base image designed for RKE2 {{user `rke2_semver`}}",
-        "ami_groups": "all",
-        "ami_regions": "ap-south-1,eu-west-3,eu-west-2,eu-west-1,ap-northeast-2,ap-northeast-1,sa-east-1,ca-central-1,ap-southeast-1,ap-southeast-2,eu-central-1,us-east-1,us-east-2,us-west-1,us-west-2",
+        "ami_regions": "{{user `ami_regions`}}",
         "ami_users": "",
         "aws_access_key": "",
         "aws_profile": "",
-        "aws_region": "us-east-1",
+        "aws_region": "us-west-1",
         "aws_secret_key": "",
         "aws_security_group_ids": "",
         "aws_session_token": "",
         "build_timestamp": "{{timestamp}}",
         "builder_instance_type": "t3.small",
-        "containerd_version": null,
         "encrypted": "false",
         "iam_instance_profile": "",
         "iops": "3000",
@@ -105,9 +103,9 @@
         "rke2_semver": null,
         "skip_create_ami": "false",
         "skip_profile_validation": "false",
-        "snapshot_groups": "all",
         "snapshot_users": "",
         "ssh_keypair_name": "",
+        "ssh_private_key_file": "",
         "subnet_id": "",
         "temporary_security_group_source_cidrs": "",
         "throughput": "125",

@@ -20,10 +20,10 @@ aws ec2 create-default-vpc
 
 ### Steps
 
-For building the AWS AMIs, you can run the following command:
+For building the AWS AMIs, you can run the following command, this command will build a private openSUSE AMI:
 
 ```bash
-make build-aws-all
+make build-aws-opensuse-leap-155 RKE2_VERSION=${RKE2_VERSION}
 ```
 or 
 

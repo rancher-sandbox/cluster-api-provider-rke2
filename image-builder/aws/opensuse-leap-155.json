@@ -1,0 +1,13 @@
+{
+    "ami_filter_name": "openSUSE-Leap-15-5-v20240311-hvm-ssd-x86_64-5535c495-72d4-4355-b169-54ffa874f849",
+    "ami_filter_owners": "679593333241",
+    "ami_regions": "us-west-1",
+    "build_name": "openSUSE-leap-15.5-rke2",
+    "distribution": "openSUSE",
+    "distribution_release": "Leap",
+    "distribution_version": "15.5",
+    "root_device_name": "/dev/sda1",
+    "source_ami": "",
+    "ssh_username": "ec2-user",
+    "bootstrap_script_path": "./scripts/opensuse/bootstrap.sh"
+}
