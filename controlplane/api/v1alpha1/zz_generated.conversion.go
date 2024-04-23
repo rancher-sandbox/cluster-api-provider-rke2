@@ -156,6 +156,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*apiv1alpha1.RKE2ConfigSpec)(nil), (*apiv1beta1.RKE2ConfigSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_RKE2ConfigSpec_To_v1beta1_RKE2ConfigSpec(a.(*apiv1alpha1.RKE2ConfigSpec), b.(*apiv1beta1.RKE2ConfigSpec), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*RKE2ControlPlaneStatus)(nil), (*v1beta1.RKE2ControlPlaneStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_RKE2ControlPlaneStatus_To_v1beta1_RKE2ControlPlaneStatus(a.(*RKE2ControlPlaneStatus), b.(*v1beta1.RKE2ControlPlaneStatus), scope)
 	}); err != nil {
@@ -168,6 +173,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*RKE2ControlPlaneTemplateStatus)(nil), (*v1beta1.RKE2ControlPlaneStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_RKE2ControlPlaneTemplateStatus_To_v1beta1_RKE2ControlPlaneStatus(a.(*RKE2ControlPlaneTemplateStatus), b.(*v1beta1.RKE2ControlPlaneStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*apiv1beta1.RKE2ConfigSpec)(nil), (*apiv1alpha1.RKE2ConfigSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_RKE2ConfigSpec_To_v1alpha1_RKE2ConfigSpec(a.(*apiv1beta1.RKE2ConfigSpec), b.(*apiv1alpha1.RKE2ConfigSpec), scope)
 	}); err != nil {
 		return err
 	}
@@ -381,8 +391,9 @@ func Convert_v1beta1_RKE2ControlPlaneList_To_v1alpha1_RKE2ControlPlaneList(in *v
 }
 
 func autoConvert_v1alpha1_RKE2ControlPlaneSpec_To_v1beta1_RKE2ControlPlaneSpec(in *RKE2ControlPlaneSpec, out *v1beta1.RKE2ControlPlaneSpec, s conversion.Scope) error {
-	// FIXME: Provide conversion function to convert apiv1alpha1.RKE2ConfigSpec to apiv1beta1.RKE2ConfigSpec
-	compileErrorOnMissingConversion()
+	if err := Convert_v1alpha1_RKE2ConfigSpec_To_v1beta1_RKE2ConfigSpec(&in.RKE2ConfigSpec, &out.RKE2ConfigSpec, s); err != nil {
+		return err
+	}
 	out.Replicas = (*int32)(unsafe.Pointer(in.Replicas))
 	if err := Convert_v1alpha1_RKE2ServerConfig_To_v1beta1_RKE2ServerConfig(&in.ServerConfig, &out.ServerConfig, s); err != nil {
 		return err
@@ -402,8 +413,9 @@ func Convert_v1alpha1_RKE2ControlPlaneSpec_To_v1beta1_RKE2ControlPlaneSpec(in *R
 }
 
 func autoConvert_v1beta1_RKE2ControlPlaneSpec_To_v1alpha1_RKE2ControlPlaneSpec(in *v1beta1.RKE2ControlPlaneSpec, out *RKE2ControlPlaneSpec, s conversion.Scope) error {
-	// FIXME: Provide conversion function to convert apiv1beta1.RKE2ConfigSpec to apiv1alpha1.RKE2ConfigSpec
-	compileErrorOnMissingConversion()
+	if err := Convert_v1beta1_RKE2ConfigSpec_To_v1alpha1_RKE2ConfigSpec(&in.RKE2ConfigSpec, &out.RKE2ConfigSpec, s); err != nil {
+		return err
+	}
 	out.Replicas = (*int32)(unsafe.Pointer(in.Replicas))
 	// WARNING: in.Version requires manual conversion: does not exist in peer-type
 	// WARNING: in.MachineTemplate requires manual conversion: does not exist in peer-type
