@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/blang/semver/v4 v4.0.0
-	github.com/coreos/butane v0.19.0
+	github.com/coreos/butane v0.21.0
 	github.com/coreos/ignition/v2 v2.18.0
 	github.com/go-logr/logr v1.4.1
 	github.com/google/gofuzz v1.2.0
@@ -117,7 +117,7 @@ require (
 	github.com/spf13/cobra v1.8.0 // indirect
 	github.com/spf13/viper v1.18.2 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
-	github.com/stretchr/testify v1.8.4 // indirect
+	github.com/stretchr/testify v1.9.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
 	github.com/vincent-petithory/dataurl v1.0.0 // indirect
