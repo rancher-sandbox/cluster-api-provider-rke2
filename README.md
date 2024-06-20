@@ -334,5 +334,5 @@ tilt up
 If you use `docker` as your infrastructure provider without any modification, Cluster creation will stall after provisioning the first node, and the API will not be available using the LB address. This is caused by Load Balancer configuration used in CAPD which is not compatible with RKE2. Therefore, it is necessary to use our own fork of `v1.3.3` by using a specific clusterctl configuration.
 
 ## Get in contact
-You can get in contact with us via the [#capbr](https://rancher-users.slack.com/archives/C046X0CDKCH) channel on the [Rancher Users Slack](https://slack.rancher.io/).
+You can get in contact with us via the [#cabpr](https://rancher-users.slack.com/archives/C046X0CDKCH) channel on the [Rancher Users Slack](https://slack.rancher.io/).
 
