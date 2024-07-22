@@ -2,11 +2,11 @@
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
 metadata:
-  name: ${CLUSTER_NAME}
-  namespace: ${NAMESPACE}
   labels:
     ccm: external
     csi: external
+  name: ${CLUSTER_NAME}
+  namespace: ${NAMESPACE}
 spec:
   clusterNetwork:
     pods:
@@ -29,36 +29,58 @@ metadata:
 spec:
   bastion:
     enabled: true
+  controlPlaneLoadBalancer:
+    additionalListeners:
+    - port: 9345
+      protocol: TCP
+    - port: 2379
+      protocol: TCP
+    ingressRules:
+    - description: RKE2 Control Plane
+      fromPort: 9345
+      natGatewaysIPsSource: true
+      protocol: tcp
+      toPort: 9345
+    - cidrBlocks:
+      - 0.0.0.0/0
+      description: Kubernetes API
+      fromPort: 6443
+      protocol: tcp
+      toPort: 6443
+    - description: Etcd
+      fromPort: 2379
+      natGatewaysIPsSource: true
+      protocol: tcp
+      toPort: 2379
+    - description: Etcd peer
+      fromPort: 2380
+      natGatewaysIPsSource: true
+      protocol: tcp
+      toPort: 2380
+    loadBalancerType: nlb
   network:
+    additionalControlPlaneIngressRules:
+    - description: RKE2 Control Plane additional group
+      fromPort: 9345
+      protocol: tcp
+      sourceSecurityGroupRoles:
+      - node
+      - controlplane
+      - apiserver-lb
+      - lb
+      toPort: 9345
+    - description: Etcd
+      fromPort: 2379
+      natGatewaysIPsSource: true
+      protocol: tcp
+      toPort: 2379
+    - description: Etcd peer
+      fromPort: 2380
+      natGatewaysIPsSource: true
+      protocol: tcp
+      toPort: 2380
     vpc:
       availabilityZoneUsageLimit: 1
-    additionalControlPlaneIngressRules:
-      - description: "RKE2 Control Plane additional group"
-        protocol: "tcp"
-        fromPort: 9345
-        toPort: 9345
-        sourceSecurityGroupRoles:
-          - node
-          - controlplane
-  controlPlaneLoadBalancer:
-      loadBalancerType: nlb
-      additionalListeners:
-        - port: 9345
-          protocol: "TCP"
-      ingressRules:
-      - description: RKE2 Control Plane
-        fromPort: 9345
-        protocol: tcp
-        sourceSecurityGroupRoles:
-        - node
-        - controlplane
-        toPort: 9345
-      - description: Kubernetes API
-        fromPort: 6443
-        protocol: tcp
-        toPort: 6443
-        cidrBlocks: 
-        - "0.0.0.0/0"
   region: ${AWS_REGION}
   sshKeyName: ${AWS_SSH_KEY_NAME}
 
@@ -87,7 +109,7 @@ spec:
       backupConfig:
         retention: "10"
         scheduleCron: "*/15 * * * *"
-  registrationMethod: "internal-first"
+  registrationMethod: control-plane-endpoint
   rolloutStrategy:
     type: "RollingUpdate"
     rollingUpdate:
@@ -163,12 +185,23 @@ spec:
     spec:
       agentConfig:
         airGapped: true
+      preRKE2Commands:
+      - sudo hostnamectl set-hostname $(curl -s http://169.254.169.254/1.0/meta-data/hostname)
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSClusterControllerIdentity
+metadata:
+  name: default
+  namespace: ${NAMESPACE}
+spec:
+  allowedNamespaces:
+    list:
+    - ${NAMESPACE}
 ---
 apiVersion: addons.cluster.x-k8s.io/v1beta1
 kind: ClusterResourceSet
 metadata:
   name: crs-ccm
-  namespace: ${NAMESPACE}
 spec:
   clusterSelector:
     matchLabels:
@@ -182,7 +215,6 @@ apiVersion: addons.cluster.x-k8s.io/v1beta1
 kind: ClusterResourceSet
 metadata:
   name: crs-csi
-  namespace: ${NAMESPACE}
 spec:
   clusterSelector:
     matchLabels:
@@ -237,9 +269,12 @@ data:
           serviceAccountName: cloud-controller-manager
           containers:
             - name: aws-cloud-controller-manager
-              image: gcr.io/k8s-staging-provider-aws/cloud-controller-manager:v1.20.0-alpha.0
+              image: registry.k8s.io/provider-aws/cloud-controller-manager:v1.28.3
               args:
                 - --v=2
+                - --cloud-provider=aws
+                - --use-service-account-credentials=true
+                - --configure-cloud-routes=false
               resources:
                 requests:
                   cpu: 200m
@@ -271,86 +306,88 @@ data:
     metadata:
       name: system:cloud-controller-manager
     rules:
-      - apiGroups:
-          - ""
-        resources:
-          - events
-        verbs:
-          - create
-          - patch
-          - update
-      - apiGroups:
-          - ""
-        resources:
-          - nodes
-        verbs:
-          - '*'
-      - apiGroups:
-          - ""
-        resources:
-          - nodes/status
-        verbs:
-          - patch
-      - apiGroups:
-          - ""
-        resources:
-          - services
-        verbs:
-          - list
-          - patch
-          - update
-          - watch
-      - apiGroups:
-          - ""
-        resources:
-          - services/status
-        verbs:
-          - list
-          - patch
-          - update
-          - watch
-      - apiGroups:
-          - ""
-        resources:
-          - serviceaccounts
-        verbs:
-          - create
-      - apiGroups:
-          - ""
-        resources:
-          - persistentvolumes
-        verbs:
-          - get
-          - list
-          - update
-          - watch
-      - apiGroups:
-          - ""
-        resources:
-          - configmaps
-        verbs:
-          - list
-          - watch
-      - apiGroups:
-          - ""
-        resources:
-          - endpoints
-        verbs:
-          - create
-          - get
-          - list
-          - watch
-          - update
-      - apiGroups:
-          - coordination.k8s.io
-        resources:
-          - leases
-        verbs:
-          - create
-          - get
-          - list
-          - watch
-          - update
+    - apiGroups:
+      - ""
+      resources:
+      - events
+      verbs:
+      - create
+      - patch
+      - update
+    - apiGroups:
+      - ""
+      resources:
+      - nodes
+      verbs:
+      - '*'
+    - apiGroups:
+      - ""
+      resources:
+      - nodes/status
+      verbs:
+      - patch
+    - apiGroups:
+      - ""
+      resources:
+      - services
+      verbs:
+      - list
+      - patch
+      - update
+      - watch
+    - apiGroups:
+      - ""
+      resources:
+      - services/status
+      verbs:
+      - list
+      - patch
+      - update
+      - watch
+    - apiGroups:
+      - ""
+      resources:
+      - serviceaccounts
+      verbs:
+      - create
+      - get
+      - list
+      - watch
+    - apiGroups:
+      - ""
+      resources:
+      - persistentvolumes
+      verbs:
+      - get
+      - list
+      - update
+      - watch
+    - apiGroups:
+      - ""
+      resources:
+      - endpoints
+      verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+    - apiGroups:
+      - coordination.k8s.io
+      resources:
+      - leases
+      verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+    - apiGroups:
+      - ""
+      resources:
+      - serviceaccounts/token
+      verbs:
+      - create
     ---
     kind: ClusterRoleBinding
     apiVersion: rbac.authorization.k8s.io/v1
@@ -372,7 +409,6 @@ metadata:
   labels:
     type: generated
   name: cloud-controller-manager-addon
-  namespace: ${NAMESPACE}
 ---
 apiVersion: v1
 data:
@@ -401,6 +437,38 @@ data:
         app.kubernetes.io/name: aws-ebs-csi-driver
       name: ebs-csi-node-sa
       namespace: kube-system
+    ---
+    kind: ClusterRoleBinding
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: ebs-csi-node-getter-binding
+      labels:
+        app.kubernetes.io/name: aws-ebs-csi-driver
+    subjects:
+      - kind: ServiceAccount
+        name: ebs-csi-node-sa
+        namespace: kube-system
+    roleRef:
+      kind: ClusterRole
+      name: ebs-csi-node-role
+      apiGroup: rbac.authorization.k8s.io
+    ---
+    kind: ClusterRole
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: ebs-csi-node-role
+      labels:
+        app.kubernetes.io/name: aws-ebs-csi-driver
+    rules:
+      - apiGroups: [""]
+        resources: ["nodes"]
+        verbs: ["get", "patch"]
+      - apiGroups: ["storage.k8s.io"]
+        resources: ["volumeattachments"]
+        verbs: ["get", "list", "watch"]
+      - apiGroups: ["storage.k8s.io"]
+        resources: ["csinodes"]
+        verbs: ["get"]
     ---
     apiVersion: rbac.authorization.k8s.io/v1
     kind: ClusterRole
@@ -758,7 +826,7 @@ data:
                       key: access_key
                       name: aws-secret
                       optional: true
-              image: registry.k8s.io/provider-aws/aws-ebs-csi-driver:v1.2.0
+              image: registry.k8s.io/provider-aws/aws-ebs-csi-driver:v1.25.0
               imagePullPolicy: IfNotPresent
               livenessProbe:
                 failureThreshold: 5
@@ -794,7 +862,7 @@ data:
               env:
                 - name: ADDRESS
                   value: /var/lib/csi/sockets/pluginproxy/csi.sock
-              image: registry.k8s.io/sig-storage/csi-provisioner:v2.1.1
+              image: registry.k8s.io/sig-storage/csi-provisioner:v3.6.2
               name: csi-provisioner
               volumeMounts:
                 - mountPath: /var/lib/csi/sockets/pluginproxy/
@@ -806,7 +874,7 @@ data:
               env:
                 - name: ADDRESS
                   value: /var/lib/csi/sockets/pluginproxy/csi.sock
-              image: registry.k8s.io/sig-storage/csi-attacher:v3.1.0
+              image: registry.k8s.io/sig-storage/csi-attacher:v4.4.2
               name: csi-attacher
               volumeMounts:
                 - mountPath: /var/lib/csi/sockets/pluginproxy/
@@ -817,7 +885,7 @@ data:
               env:
                 - name: ADDRESS
                   value: /var/lib/csi/sockets/pluginproxy/csi.sock
-              image: registry.k8s.io/sig-storage/csi-snapshotter:v3.0.3
+              image: registry.k8s.io/sig-storage/csi-snapshotter:v6.3.2
               name: csi-snapshotter
               volumeMounts:
                 - mountPath: /var/lib/csi/sockets/pluginproxy/
@@ -828,7 +896,7 @@ data:
               env:
                 - name: ADDRESS
                   value: /var/lib/csi/sockets/pluginproxy/csi.sock
-              image: registry.k8s.io/sig-storage/csi-resizer:v1.0.0
+              image: registry.k8s.io/sig-storage/csi-resizer:v1.9.2
               imagePullPolicy: Always
               name: csi-resizer
               volumeMounts:
@@ -836,7 +904,7 @@ data:
                   name: socket-dir
             - args:
                 - --csi-address=/csi/csi.sock
-              image: registry.k8s.io/sig-storage/livenessprobe:v2.2.0
+              image: registry.k8s.io/sig-storage/livenessprobe:v2.11.0
               name: liveness-probe
               volumeMounts:
                 - mountPath: /csi
@@ -923,7 +991,7 @@ data:
                   valueFrom:
                     fieldRef:
                       fieldPath: spec.nodeName
-              image: registry.k8s.io/provider-aws/aws-ebs-csi-driver:v1.2.0
+              image: registry.k8s.io/provider-aws/aws-ebs-csi-driver:v1.25.0
               livenessProbe:
                 failureThreshold: 5
                 httpGet:
@@ -956,7 +1024,7 @@ data:
                   value: /csi/csi.sock
                 - name: DRIVER_REG_SOCK_PATH
                   value: /var/lib/kubelet/plugins/ebs.csi.aws.com/csi.sock
-              image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.1.0
+              image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.9.2
               name: node-driver-registrar
               volumeMounts:
                 - mountPath: /csi
@@ -965,7 +1033,7 @@ data:
                   name: registration-dir
             - args:
                 - --csi-address=/csi/csi.sock
-              image: registry.k8s.io/sig-storage/livenessprobe:v2.2.0
+              image: registry.k8s.io/sig-storage/livenessprobe:v2.11.0
               name: liveness-probe
               volumeMounts:
                 - mountPath: /csi
@@ -1018,14 +1086,3 @@ metadata:
   labels:
     type: generated
   name: aws-ebs-csi-driver-addon
-  namespace: ${NAMESPACE}
----
-apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
-kind: AWSClusterControllerIdentity
-metadata:
-  name: default
-  namespace: ${NAMESPACE}
-spec:
-  allowedNamespaces:
-    list:
-    - ${NAMESPACE}

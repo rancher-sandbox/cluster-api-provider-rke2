@@ -20,16 +20,12 @@ clusterctl init --bootstrap rke2 --control-plane rke2 --infrastructure aws
 
 Before creating a workload clusters, it is required to build an AMI for the RKE2 version that is going to be installed on the cluster. You can follow the steps in the [image-builder README](../../image-builder/README.md#aws) to build the AMI.
 
-The `internal` folder contains cluster templates to deploy an RKE2 cluster on AWS using the internal cloud provider (is DEPRECATED in favor of the external one), and the `external` folder contains the cluster templates to deploy a cluster with the external cloud provider.
-
-We will use the `internal` one for this guide, however the same steps apply for the `external` example.
-
 You will need to set the following environment variables:
 
 ```bash
 export CONTROL_PLANE_MACHINE_COUNT=3
 export WORKER_MACHINE_COUNT=1
-export RKE2_VERSION=v1.26.0+rke2r1
+export RKE2_VERSION=v1.30.2+rke2r1
 export AWS_NODE_MACHINE_TYPE=t3a.large
 export AWS_CONTROL_PLANE_MACHINE_TYPE=t3a.large 
 export AWS_SSH_KEY_NAME="aws-ssh-key"
@@ -40,7 +36,7 @@ export AWS_AMI_ID="ami-id"
 Now, we can generate the YAML files from the templates using `clusterctl generate yaml` command:
 
 ```bash
-clusterctl generate cluster --from https://github.com/rancher/cluster-api-provider-rke2/blob/main/samples/aws/internal/cluster-template.yaml -n example-aws rke2-aws > aws-rke2-clusterctl.yaml
+clusterctl generate cluster --from https://github.com/rancher/cluster-api-provider-rke2/blob/main/samples/aws/cluster-template.yaml -n example-aws rke2-aws > aws-rke2-clusterctl.yaml
 ```
 
 After examining the result YAML file, you can apply to the management cluster using :
@@ -98,6 +94,6 @@ export AWS_S3_BUCKET_NAME=<YOUR_AWS_S3_BUCKET_NAME>
 Now you can generate manifests from the cluster template:
 
 ```bash
-clusterctl generate cluster --from https://github.com/rancher/cluster-api-provider-rke2/blob/main/samples/aws/ignition-external/cluster-template-aws-ignition-external-cloud-provider.yaml -n example-aws rke2-aws > aws-rke2-clusterctl.yaml
+clusterctl generate cluster --from https://github.com/rancher/cluster-api-provider-rke2/blob/main/samples/aws/ignition/cluster-template-ignition.yaml -n example-aws rke2-aws > aws-rke2-clusterctl.yaml
 ```
 
