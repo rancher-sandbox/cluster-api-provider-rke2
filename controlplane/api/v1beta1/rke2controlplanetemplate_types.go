@@ -56,5 +56,5 @@ type RKE2ControlPlaneTemplateList struct {
 }
 
 func init() { //nolint:gochecknoinits
-	SchemeBuilder.Register(&RKE2ControlPlaneTemplate{}, &RKE2ControlPlaneTemplateList{})
+	objectTypes = append(objectTypes, &RKE2ControlPlaneTemplate{}, &RKE2ControlPlaneTemplateList{})
 }

@@ -3,7 +3,7 @@ apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
 metadata:
   name: ${CLUSTER_NAME}
-  namespace: ${CLUSTER_NAMESPACE}
+  namespace: ${NAMESPACE}
 spec:
   clusterNetwork:
     pods:
@@ -22,7 +22,7 @@ apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSCluster
 metadata:
   name: ${CLUSTER_NAME}
-  namespace: ${CLUSTER_NAMESPACE}
+  namespace: ${NAMESPACE}
 spec:
   bastion:
     enabled: true
@@ -43,13 +43,19 @@ spec:
         - port: 9345
           protocol: "TCP"
       ingressRules:
-        - description: "RKE2 Control Plane"
-          protocol: "tcp"
-          fromPort: 9345
-          toPort: 9345
-          sourceSecurityGroupRoles:
-            - node
-            - controlplane
+      - description: RKE2 Control Plane
+        fromPort: 9345
+        protocol: tcp
+        sourceSecurityGroupRoles:
+        - node
+        - controlplane
+        toPort: 9345
+      - description: Kubernetes API
+        fromPort: 6443
+        protocol: tcp
+        toPort: 6443
+        cidrBlocks: 
+        - "0.0.0.0/0"
   region: ${AWS_REGION}
   sshKeyName: ${AWS_SSH_KEY_NAME}
 
@@ -58,20 +64,19 @@ apiVersion: controlplane.cluster.x-k8s.io/v1beta1
 kind: RKE2ControlPlane
 metadata:
   name: ${CLUSTER_NAME}-control-plane
-  namespace: ${CLUSTER_NAMESPACE}
+  namespace: ${NAMESPACE}
 spec:
-  version: ${RKE2_VERSION}  # This field has no effect for now, but is required to constuct the image name
+  version: ${RKE2_VERSION}
   preRKE2Commands:
   - sudo hostnamectl set-hostname $(curl -s http://169.254.169.254/1.0/meta-data/hostname)
   agentConfig:
     airGapped: true
-    version: ${RKE2_VERSION}
   infrastructureRef:
     apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
     kind: AWSMachineTemplate
     name: ${CLUSTER_NAME}-control-plane
   nodeDrainTimeout: 2m
-  replicas: 3
+  replicas: ${CONTROL_PLANE_MACHINE_COUNT}
   serverConfig:
     cloudProviderName: aws
     cni: calico
@@ -79,12 +84,17 @@ spec:
       backupConfig:
         retention: "10"
         scheduleCron: "*/15 * * * *"
+  registrationMethod: "internal-first"
+  rolloutStrategy:
+    type: "RollingUpdate"
+    rollingUpdate:
+      maxSurge: 1
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSMachineTemplate
 metadata:
   name: ${CLUSTER_NAME}-control-plane
-  namespace: ${CLUSTER_NAMESPACE}
+  namespace: ${NAMESPACE}
 spec:
   template:
     spec:
@@ -100,10 +110,10 @@ apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachineDeployment
 metadata:
   name: ${CLUSTER_NAME}-md-0
-  namespace: ${CLUSTER_NAMESPACE}
+  namespace: ${NAMESPACE}
 spec:
   clusterName: ${CLUSTER_NAME}
-  replicas: ${CABPR_WK_REPLICAS}
+  replicas: ${WORKER_MACHINE_COUNT}
   selector:
     matchLabels:
       cluster.x-k8s.io/cluster-name: ${CLUSTER_NAME}
@@ -128,7 +138,7 @@ apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSMachineTemplate
 metadata:
   name: ${CLUSTER_NAME}-md-0
-  namespace: ${CLUSTER_NAMESPACE}
+  namespace: ${NAMESPACE}
 spec:
   template:
     spec:
@@ -144,21 +154,20 @@ apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
 kind: RKE2ConfigTemplate
 metadata:
   name: ${CLUSTER_NAME}-md-0
-  namespace: ${CLUSTER_NAMESPACE}
+  namespace: ${NAMESPACE}
 spec: 
   template:
     spec:
       agentConfig:
         airGapped: true
-        version: ${RKE2_VERSION}
 ---
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
 kind: AWSClusterControllerIdentity
 metadata:
   name: default
-  namespace: ${CLUSTER_NAMESPACE}
+  namespace: ${NAMESPACE}
 spec:
   allowedNamespaces:
     list:
-    - ${CLUSTER_NAMESPACE}
+    - ${NAMESPACE}
     

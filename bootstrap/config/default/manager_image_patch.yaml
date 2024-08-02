@@ -7,5 +7,5 @@ spec:
   template:
     spec:
       containers:
-        - image: ghcr.io/rancher-sandbox/cluster-api-provider-rke2-bootstrap:dev
+        - image: ghcr.io/rancher/cluster-api-provider-rke2-bootstrap:dev
           name: manager

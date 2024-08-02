@@ -123,6 +123,12 @@ spec:
                               AirGapped is a boolean value to define if the bootstrapping should be air-gapped,
                               basically supposing that online container registries and RKE2 install scripts are not reachable.
                             type: boolean
+                          airGappedChecksum:
+                            description: |-
+                              AirGappedChecksum is a string value with a sha256sum checksum to compare with checksum
+                              of existing sha256sum-<arch>.txt file for packages already available on the machine
+                              before performing air-gapped installation.
+                            type: string
                           cisProfile:
                             description: CISProfile activates CIS compliance of RKE2
                               for a certain profile
@@ -364,12 +370,6 @@ spec:
                           systemDefaultRegistry:
                             description: SystemDefaultRegistry Private registry to
                               be used for all system images.
-                            type: string
-                          version:
-                            description: |-
-                              Version specifies the rke2 version.
-                              This field will be deprecated in newer versions of the API and RKE2ControlPlaneSpec.Version will be used instead.
-                            pattern: v(\d\.\d{2}\.\d)\+rke2r\d
                             type: string
                         type: object
                       files:
@@ -774,7 +774,6 @@ spec:
                           the registration type is "address". Its for scenarios where a load-balancer or VIP is used.
                         type: string
                       registrationMethod:
-                        default: internal-first
                         description: RegistrationMethod is the method to use for registering
                           nodes into the RKE2 cluster.
                         enum:
@@ -790,10 +789,6 @@ spec:
                         format: int32
                         type: integer
                       rolloutStrategy:
-                        default:
-                          rollingUpdate:
-                            maxSurge: 1
-                          type: RollingUpdate
                         description: The RolloutStrategy to use to replace control
                           plane machines with new ones.
                         properties:
@@ -1303,10 +1298,11 @@ spec:
                         description: |-
                           Version defines the desired Kubernetes version.
                           This field takes precedence over RKE2ConfigSpec.AgentConfig.Version (which is deprecated).
-                        pattern: v(\d\.\d{2}\.\d)\+rke2r\d
+                        pattern: (v\d\.\d{2}\.\d+\+rke2r\d)|^$
                         type: string
                     required:
                     - infrastructureRef
+                    - rolloutStrategy
                     type: object
                 required:
                 - spec

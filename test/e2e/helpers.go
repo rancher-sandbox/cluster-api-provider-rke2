@@ -33,9 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 
-	controlplanev1alpha1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1alpha1"
-	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1beta1"
-	bsutil "github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/util"
+	controlplanev1alpha1 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1alpha1"
+	controlplanev1 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta1"
+	bsutil "github.com/rancher/cluster-api-provider-rke2/pkg/util"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/test/framework"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
@@ -419,7 +419,6 @@ func WaitForClusterToUpgrade(ctx context.Context, input WaitForClusterToUpgradeI
 		totalMachineCount = *input.ControlPlane.Spec.Replicas
 	} else {
 		totalMachineCount = *input.LegacyControlPlane.Spec.Replicas
-
 	}
 	for _, md := range input.MachineDeployments {
 		totalMachineCount += *md.Spec.Replicas

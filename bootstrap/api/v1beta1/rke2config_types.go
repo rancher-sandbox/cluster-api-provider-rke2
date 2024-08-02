@@ -146,15 +146,15 @@ type RKE2AgentConfig struct {
 	//+optional
 	LoadBalancerPort int `json:"loadBalancerPort,omitempty"`
 
-	// Version specifies the rke2 version.
-	// This field will be deprecated in newer versions of the API and RKE2ControlPlaneSpec.Version will be used instead.
-	// +kubebuilder:validation:Pattern="v(\\d\\.\\d{2}\\.\\d)\\+rke2r\\d"
-	//+optional
-	Version string `json:"version,omitempty"`
-
 	// AirGapped is a boolean value to define if the bootstrapping should be air-gapped,
 	// basically supposing that online container registries and RKE2 install scripts are not reachable.
 	AirGapped bool `json:"airGapped,omitempty"`
+
+	// AirGappedChecksum is a string value with a sha256sum checksum to compare with checksum
+	// of existing sha256sum-<arch>.txt file for packages already available on the machine
+	// before performing air-gapped installation.
+	//+optional
+	AirGappedChecksum string `json:"airGappedChecksum,omitempty"`
 
 	// Format specifies the output format of the bootstrap data. Defaults to cloud-config.
 	// +optional
@@ -401,5 +401,5 @@ type ComponentConfig struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&RKE2Config{}, &RKE2ConfigList{})
+	objectTypes = append(objectTypes, &RKE2Config{}, &RKE2ConfigList{})
 }

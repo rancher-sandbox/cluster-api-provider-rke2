@@ -19,7 +19,7 @@ package cloudinit
 import (
 	"fmt"
 
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/secret"
+	"github.com/rancher/cluster-api-provider-rke2/pkg/secret"
 )
 
 //nolint:lll
@@ -30,6 +30,8 @@ const (
 {{template "arbitrary" .AdditionalArbitraryData}}
 runcmd:
 {{- template "commands" .PreRKE2Commands }}
+{{- if .AirGappedChecksum }}
+  - [[ $(sha256sum /opt/rke2-artifacts/sha256sum*.txt | awk '{print $1}') == {{ .AirGappedChecksum }} ]] || exit 1{{ end }}
   - {{ if .AirGapped }}INSTALL_RKE2_ARTIFACT_PATH=/opt/rke2-artifacts sh /opt/install.sh{{ else }}'curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=%[1]s sh -s - server'{{ end }} 
 {{- if .CISEnabled }}
   - '/opt/rke2-cis-script.sh'{{ end }}

@@ -24,16 +24,14 @@ import (
 
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/etcd/fake"
+	"github.com/rancher/cluster-api-provider-rke2/pkg/etcd/fake"
 
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"k8s.io/client-go/rest"
 )
 
-var (
-	subject *ClientGenerator
-)
+var subject *ClientGenerator
 
 func TestNewEtcdClientGenerator(t *testing.T) {
 	g := NewWithT(t)
@@ -128,7 +126,8 @@ func TestForLeader(t *testing.T) {
 							},
 						},
 						AlarmResponse: &clientv3.AlarmResponse{},
-					}}, nil
+					},
+				}, nil
 			},
 			expectedClient: Client{
 				Endpoint: "etcd-node-leader",
@@ -140,7 +139,8 @@ func TestForLeader(t *testing.T) {
 						},
 					},
 					AlarmResponse: &clientv3.AlarmResponse{},
-				}},
+				},
+			},
 		},
 		{
 			name:  "Returns client for leader even when one or more nodes are down",
@@ -159,7 +159,8 @@ func TestForLeader(t *testing.T) {
 							},
 						},
 						AlarmResponse: &clientv3.AlarmResponse{},
-					}}, nil
+					},
+				}, nil
 			},
 			expectedClient: Client{
 				Endpoint: "etcd-node-leader",
@@ -170,7 +171,8 @@ func TestForLeader(t *testing.T) {
 						},
 					},
 					AlarmResponse: &clientv3.AlarmResponse{},
-				}},
+				},
+			},
 		},
 		{
 			name:        "Fails when called with an empty node list",
@@ -193,7 +195,8 @@ func TestForLeader(t *testing.T) {
 							},
 						},
 						AlarmResponse: &clientv3.AlarmResponse{},
-					}}, nil
+					},
+				}, nil
 			},
 			expectedErr: "etcd leader is reported as 6c1 with name \"node-leader\", but we couldn't find a corresponding Node in the cluster",
 		},

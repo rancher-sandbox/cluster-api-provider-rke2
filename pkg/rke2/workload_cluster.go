@@ -28,6 +28,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
@@ -41,8 +42,8 @@ import (
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/patch"
 
-	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1beta1"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/etcd"
+	controlplanev1 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta1"
+	"github.com/rancher/cluster-api-provider-rke2/pkg/etcd"
 )
 
 const (
@@ -51,6 +52,7 @@ const (
 	etcdDialTimeout           = 10 * time.Second
 	etcdCallTimeout           = 15 * time.Second
 	minimalNodeCount          = 2
+	rke2ServingSecretKey      = "rke2-serving" //nolint: gosec
 )
 
 // ErrControlPlaneMinNodes is returned when the control plane has fewer than 2 nodes.
@@ -62,7 +64,7 @@ type WorkloadCluster interface {
 	InitWorkload(ctx context.Context, controlPlane *ControlPlane) error
 	UpdateNodeMetadata(ctx context.Context, controlPlane *ControlPlane) error
 
-	ClusterStatus() ClusterStatus
+	ClusterStatus(ctx context.Context) ClusterStatus
 	UpdateAgentConditions(controlPlane *ControlPlane)
 	UpdateEtcdConditions(controlPlane *ControlPlane)
 	// Upgrade related tasks.
@@ -196,6 +198,8 @@ type ClusterStatus struct {
 	Nodes int32
 	// ReadyNodes are the count of nodes that are reporting ready
 	ReadyNodes int32
+	// HasRKE2ServingSecret will be true if the rke2-serving secret has been uploaded, false otherwise.
+	HasRKE2ServingSecret bool
 }
 
 func (w *Workload) getControlPlaneNodes(ctx context.Context) (*corev1.NodeList, error) {
@@ -253,7 +257,7 @@ func (w *Workload) PatchNodes(ctx context.Context, cp *ControlPlane) error {
 }
 
 // ClusterStatus returns the status of the cluster.
-func (w *Workload) ClusterStatus() ClusterStatus {
+func (w *Workload) ClusterStatus(ctx context.Context) ClusterStatus {
 	status := ClusterStatus{}
 
 	// count the control plane nodes
@@ -265,6 +269,20 @@ func (w *Workload) ClusterStatus() ClusterStatus {
 			status.ReadyNodes++
 		}
 	}
+
+	// find the rke2-serving secret
+	key := ctrlclient.ObjectKey{
+		Name:      rke2ServingSecretKey,
+		Namespace: metav1.NamespaceSystem,
+	}
+	err := w.Client.Get(ctx, key, &corev1.Secret{})
+	// In case of error we do assume the control plane is not initialized yet.
+	if err != nil {
+		logger := log.FromContext(ctx)
+		logger.Info("Control Plane does not seem to be initialized yet.", "reason", err.Error())
+	}
+
+	status.HasRKE2ServingSecret = err == nil
 
 	return status
 }

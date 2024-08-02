@@ -55,17 +55,17 @@ linters-settings:
       - "4"
       - "3"
   goimports:
-    local-prefixes: github.com/rancher-sandbox/cluster-api-provider-rke2
+    local-prefixes: github.com/rancher/cluster-api-provider-rke2
   gci:
     custom-order: true
-    #local-prefixes: github.com/rancher-sandbox/cluster-api-provider-rke2
+    #local-prefixes: github.com/rancher/cluster-api-provider-rke2
     sections:
       - "standard"
       - "blank"
       - "dot"
       - "default"
       - "prefix(sigs.k8s.io/cluster-api)"
-      - "prefix(github.com/rancher-sandbox/cluster-api-provider-rke2)"
+      - "prefix(github.com/rancher/cluster-api-provider-rke2)"
     wsl:
       force-err-cuddling: false
 linters:

@@ -16,7 +16,7 @@ spec:
       labels:
         cluster.x-k8s.io/cluster-name: ${CABPR_CLUSTER_NAME}
     spec:
-      version: ${KUBERNETES_VERSION}
+      version: ${KUBERNETES_VERSION}+rke2r1
       clusterName: ${CABPR_CLUSTER_NAME}
       bootstrap:
         configRef:

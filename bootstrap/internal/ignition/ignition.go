@@ -18,12 +18,13 @@ package ignition
 import (
 	"fmt"
 
-	bootstrapv1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1beta1"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/internal/cloudinit"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/internal/ignition/butane"
+	bootstrapv1 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta1"
+	"github.com/rancher/cluster-api-provider-rke2/bootstrap/internal/cloudinit"
+	"github.com/rancher/cluster-api-provider-rke2/bootstrap/internal/ignition/butane"
 )
 
 const (
+	airGappedChecksumCommand     = "[[ $(sha256sum /opt/rke2-artifacts/sha256sum*.txt | awk '{print $1}') == %[1]s ]] || exit 1"
 	airGappedControlPlaneCommand = "INSTALL_RKE2_ARTIFACT_PATH=/opt/rke2-artifacts sh /opt/install.sh"
 	controlPlaneCommand          = "curl -sfL https://get.rke2.io | INSTALL_RKE2_VERSION=%[1]s sh -s - server"
 	airGappedWorkerCommand       = "INSTALL_RKE2_ARTIFACT_PATH=/opt/rke2-artifacts INSTALL_RKE2_TYPE=\"agent\" sh /opt/install.sh"
@@ -41,7 +42,8 @@ var (
 			"--kubeconfig /etc/rancher/rke2/rke2.yaml |" +
 			" kubectl apply -f- --kubeconfig /etc/rancher/rke2/rke2.yaml",
 		"restorecon /etc/systemd/system/rke2-server.service",
-		"mkdir -p /run/cluster-api && echo success > /run/cluster-api/bootstrap-success.complete",
+		"mkdir -p /run/cluster-api /etc/cluster-api",
+		"echo success | tee /run/cluster-api/bootstrap-success.complete /etc/cluster-api/bootstrap-success.complete > /dev/null",
 		"setenforce 1",
 	}
 
@@ -51,7 +53,8 @@ var (
 		"systemctl enable rke2-agent.service",
 		"systemctl start rke2-agent.service",
 		"restorecon /etc/systemd/system/rke2-agent.service",
-		"mkdir -p /run/cluster-api && echo success > /run/cluster-api/bootstrap-success.complete",
+		"mkdir -p /run/cluster-api /etc/cluster-api",
+		"echo success | tee /run/cluster-api/bootstrap-success.complete /etc/cluster-api/bootstrap-success.complete > /dev/null",
 		"setenforce 1",
 	}
 )
@@ -160,7 +163,9 @@ func getRKE2Commands(baseUserData *cloudinit.BaseUserData, command, airgappedCom
 
 	rke2Commands := []string{}
 
-	if baseUserData.AirGapped {
+	if baseUserData.AirGapped && baseUserData.AirGappedChecksum != "" {
+		rke2Commands = append(rke2Commands, fmt.Sprintf(airGappedChecksumCommand, baseUserData.AirGappedChecksum), airgappedCommand)
+	} else if baseUserData.AirGapped {
 		rke2Commands = append(rke2Commands, airgappedCommand)
 	} else {
 		rke2Commands = append(rke2Commands, fmt.Sprintf(command, baseUserData.RKE2Version))

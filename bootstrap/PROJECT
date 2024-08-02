@@ -6,7 +6,7 @@ domain: cluster.x-k8s.io
 layout:
 - go.kubebuilder.io/v3
 projectName: bootstrap
-repo: github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap
+repo: github.com/rancher/cluster-api-provider-rke2/bootstrap
 resources:
 - api:
     crdVersion: v1
@@ -15,7 +15,7 @@ resources:
   domain: cluster.x-k8s.io
   group: bootstrap
   kind: Rke2Config
-  path: github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1alpha1
+  path: github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1alpha1
   version: v1alpha1
   webhooks:
     defaulting: true
@@ -27,7 +27,7 @@ resources:
   domain: cluster.x-k8s.io
   group: bootstrap
   kind: Rke2ConfigTemplate
-  path: github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1alpha1
+  path: github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1alpha1
   version: v1alpha1
   webhooks:
     defaulting: true
@@ -39,7 +39,7 @@ resources:
   domain: cluster.x-k8s.io
   group: bootstrap
   kind: RKE2ConfigTemplate
-  path: github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1beta1
+  path: github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta1
   version: v1beta1
   webhooks:
     conversion: true

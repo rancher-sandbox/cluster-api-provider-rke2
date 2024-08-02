@@ -22,8 +22,8 @@ import (
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1beta1"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/registration"
+	controlplanev1 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta1"
+	"github.com/rancher/cluster-api-provider-rke2/pkg/registration"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/collections"
 )
@@ -120,7 +120,8 @@ func TestInternalFirstMethod(t *testing.T) {
 			actualAddresses, err := regMethod(nil, tc.rcp, col)
 			g.Expect(err).NotTo(HaveOccurred())
 
-			g.Expect(actualAddresses).To(HaveExactElements(tc.expectedAddresses))
+			g.Expect(actualAddresses).To(HaveLen(len(tc.expectedAddresses)))
+			g.Expect(actualAddresses).To(ContainElements(tc.expectedAddresses))
 		})
 	}
 }
@@ -172,8 +173,8 @@ func TestInternalOnlyMethod(t *testing.T) {
 			actualAddresses, err := regMethod(nil, tc.rcp, col)
 			g.Expect(err).NotTo(HaveOccurred())
 
-			g.Expect(actualAddresses).To(HaveExactElements(tc.expectedAddresses))
-
+			g.Expect(actualAddresses).To(HaveLen(len(tc.expectedAddresses)))
+			g.Expect(actualAddresses).To(ContainElements(tc.expectedAddresses))
 		})
 	}
 }
@@ -225,8 +226,8 @@ func TestExternalOnlyMethod(t *testing.T) {
 			actualAddresses, err := regMethod(nil, tc.rcp, col)
 			g.Expect(err).NotTo(HaveOccurred())
 
-			g.Expect(actualAddresses).To(HaveExactElements(tc.expectedAddresses))
-
+			g.Expect(len(actualAddresses)).To(Equal(len(tc.expectedAddresses)))
+			g.Expect(actualAddresses).To(ContainElements(tc.expectedAddresses))
 		})
 	}
 }
@@ -276,8 +277,8 @@ func TestAddressMethod(t *testing.T) {
 
 			expectedAddresses := []string{"100.100.100.100"}
 
-			g.Expect(actualAddresses).To(HaveExactElements(expectedAddresses))
-
+			g.Expect(len(actualAddresses)).To(Equal(len(expectedAddresses)))
+			g.Expect(actualAddresses).To(ContainElements(expectedAddresses))
 		})
 	}
 }
@@ -336,8 +337,8 @@ func TestControlPlaneMethod(t *testing.T) {
 			g.Expect(err).NotTo(HaveOccurred())
 
 			expectedAddresses := []string{tc.expectedAddress}
-			g.Expect(actualAddresses).To(HaveExactElements(expectedAddresses))
-
+			g.Expect(len(actualAddresses)).To(Equal(len(expectedAddresses)))
+			g.Expect(actualAddresses).To(ContainElements(expectedAddresses))
 		})
 	}
 }
@@ -376,7 +377,6 @@ func createCluster(name string, cpHost string, cpPort int) *clusterv1.Cluster {
 	}
 
 	return cluster
-
 }
 
 func createMachine(name string, internalIPs []string, externalIPs []string) *clusterv1.Machine {

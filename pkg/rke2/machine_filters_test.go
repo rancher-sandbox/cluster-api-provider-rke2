@@ -10,8 +10,8 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/collections"
 
-	bootstrapv1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1beta1"
-	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1beta1"
+	bootstrapv1 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta1"
+	controlplanev1 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta1"
 )
 
 var (
@@ -26,6 +26,7 @@ var rcp = controlplanev1.RKE2ControlPlane{
 		Namespace: "example",
 	},
 	Spec: controlplanev1.RKE2ControlPlaneSpec{
+		Version: rke2MachineVersion,
 		ServerConfig: controlplanev1.RKE2ServerConfig{
 			CNI:               "calico",
 			CloudProviderName: "aws",
@@ -33,7 +34,6 @@ var rcp = controlplanev1.RKE2ControlPlane{
 		},
 		RKE2ConfigSpec: bootstrapv1.RKE2ConfigSpec{
 			AgentConfig: bootstrapv1.RKE2AgentConfig{
-				Version:    rke2MachineVersion,
 				NodeLabels: []string{"hello=world"},
 			},
 		},
@@ -81,7 +81,6 @@ var _ = Describe("matchAgentConfig", func() {
 				},
 				Spec: bootstrapv1.RKE2ConfigSpec{
 					AgentConfig: bootstrapv1.RKE2AgentConfig{
-						Version:    rke2MachineVersion,
 						NodeLabels: []string{"hello=world"},
 					},
 				},
@@ -93,6 +92,54 @@ var _ = Describe("matchAgentConfig", func() {
 
 		Expect(len(matches)).To(Equal(1))
 		Expect(matches.Oldest().Name).To(Equal("machine-test"))
+	},
+	)
+
+	It("shouldn't match Agent Config and different preBootstrapCommands", func() {
+		machineConfigs := map[string]*bootstrapv1.RKE2Config{
+			"someMachine": {},
+			"machine-test": {
+				ObjectMeta: v1.ObjectMeta{
+					Name:      "rke2-config-example",
+					Namespace: "example",
+				},
+				Spec: bootstrapv1.RKE2ConfigSpec{
+					AgentConfig: bootstrapv1.RKE2AgentConfig{
+						NodeLabels: []string{"hello=world"},
+					},
+					PreRKE2Commands: []string{"test"},
+				},
+			},
+		}
+		machineCollection := collections.FromMachines(&machine)
+		Expect(len(machineCollection)).To(Equal(1))
+		matches := machineCollection.AnyFilter(matchesRKE2BootstrapConfig(machineConfigs, &rcp))
+
+		Expect(len(matches)).To(Equal(0))
+	},
+	)
+
+	It("shouldn't match Agent Config and different postBootstrapCommands", func() {
+		machineConfigs := map[string]*bootstrapv1.RKE2Config{
+			"someMachine": {},
+			"machine-test": {
+				ObjectMeta: v1.ObjectMeta{
+					Name:      "rke2-config-example",
+					Namespace: "example",
+				},
+				Spec: bootstrapv1.RKE2ConfigSpec{
+					AgentConfig: bootstrapv1.RKE2AgentConfig{
+						NodeLabels: []string{"hello=world"},
+					},
+					PostRKE2Commands: []string{"test"},
+				},
+			},
+		}
+		machineCollection := collections.FromMachines(&machine)
+		Expect(len(machineCollection)).To(Equal(1))
+		matches := machineCollection.AnyFilter(matchesRKE2BootstrapConfig(machineConfigs, &rcp))
+
+		Expect(len(matches)).To(Equal(0))
 	},
 	)
 })

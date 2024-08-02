@@ -19,12 +19,14 @@ package v1alpha1
 import (
 	"testing"
 
+	fuzz "github.com/google/gofuzz"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/runtime"
+	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 
-	bootstrapv1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1beta1"
+	bootstrapv1 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta1"
 	utilconversion "sigs.k8s.io/cluster-api/util/conversion"
 )
 
@@ -38,13 +40,32 @@ func TestFuzzyConversion(t *testing.T) {
 		Scheme:      scheme,
 		Hub:         &bootstrapv1.RKE2Config{},
 		Spoke:       &RKE2Config{},
-		FuzzerFuncs: []fuzzer.FuzzerFuncs{},
+		FuzzerFuncs: []fuzzer.FuzzerFuncs{fuzzFuncs},
 	}))
 
 	t.Run("for RKE2ConfigTemplate", utilconversion.FuzzTestFunc(utilconversion.FuzzTestFuncInput{
 		Scheme:      scheme,
 		Hub:         &bootstrapv1.RKE2ConfigTemplate{},
 		Spoke:       &RKE2ConfigTemplate{},
-		FuzzerFuncs: []fuzzer.FuzzerFuncs{},
+		FuzzerFuncs: []fuzzer.FuzzerFuncs{fuzzFuncs},
 	}))
+}
+
+func fuzzFuncs(_ runtimeserializer.CodecFactory) []interface{} {
+	return []interface{}{
+		rke2ConfigFuzzer,
+		rke2ConfigTemplateFuzzer,
+	}
+}
+
+func rke2ConfigFuzzer(obj *RKE2Config, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	obj.Spec.AgentConfig.Version = ""
+}
+
+func rke2ConfigTemplateFuzzer(obj *RKE2ConfigTemplate, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	obj.Spec.Template.Spec.AgentConfig.Version = ""
 }

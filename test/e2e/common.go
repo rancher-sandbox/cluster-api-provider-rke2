@@ -172,6 +172,7 @@ func dumpSpecResourcesAndCleanup(ctx context.Context, input cleanupInput) {
 		input.AdditionalCleanup()
 	}
 }
+
 func localLoadE2EConfig(configPath string) *clusterctl.E2EConfig {
 	configData, err := os.ReadFile(configPath) //nolint:gosec
 	Expect(err).ToNot(HaveOccurred(), "Failed to read the e2e test config file")

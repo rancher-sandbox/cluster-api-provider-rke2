@@ -1,10 +1,13 @@
 package rke2
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	bootstrapv1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1beta1"
-	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1beta1"
+	"github.com/pkg/errors"
+	bootstrapv1 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta1"
+	controlplanev1 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -12,6 +15,8 @@ import (
 	"sigs.k8s.io/cluster-api/util/collections"
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 )
 
 var _ = Describe("Node metadata propagation", func() {
@@ -73,7 +78,8 @@ var _ = Describe("Node metadata propagation", func() {
 					Name:       "stub",
 					Namespace:  ns.Name,
 				},
-			}}
+			},
+		}
 
 		machineDifferentNode = &clusterv1.Machine{
 			ObjectMeta: metav1.ObjectMeta{
@@ -96,7 +102,8 @@ var _ = Describe("Node metadata propagation", func() {
 					Name:       "stub",
 					Namespace:  ns.Name,
 				},
-			}}
+			},
+		}
 
 		machineNodeRefStatus = clusterv1.MachineStatus{
 			NodeRef: &corev1.ObjectReference{
@@ -360,7 +367,6 @@ var _ = Describe("Node metadata propagation", func() {
 			clusterv1.MachineAnnotation: machineDifferentNode.Name,
 		}))
 	})
-
 })
 
 var _ = Describe("Cloud-init fields validation", func() {
@@ -392,5 +398,117 @@ var _ = Describe("Cloud-init fields validation", func() {
 				},
 			},
 		}})).ToNot(Succeed())
+	})
+})
+
+var _ = Describe("ClusterStatus validation", func() {
+	var (
+		err           error
+		ns            *corev1.Namespace
+		node1         *corev1.Node
+		node2         *corev1.Node
+		servingSecret *corev1.Secret
+		connectionErr interceptor.Funcs
+	)
+
+	BeforeEach(func() {
+		ns, err = testEnv.CreateNamespace(ctx, "ns")
+		Expect(err).ToNot(HaveOccurred())
+
+		node1 = &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node1",
+				Labels: map[string]string{
+					"node-role.kubernetes.io/master": "true",
+				},
+				Annotations: map[string]string{
+					clusterv1.MachineAnnotation: "node1",
+				},
+			},
+			Status: corev1.NodeStatus{
+				Conditions: []corev1.NodeCondition{{
+					Type:   corev1.NodeReady,
+					Status: corev1.ConditionTrue,
+				}},
+			},
+		}
+
+		node2 = &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "node2",
+				Labels: map[string]string{
+					"node-role.kubernetes.io/master": "true",
+				},
+				Annotations: map[string]string{
+					clusterv1.MachineAnnotation: "node2",
+				},
+			},
+			Status: corev1.NodeStatus{
+				Conditions: []corev1.NodeCondition{{
+					Type:   corev1.NodeReady,
+					Status: corev1.ConditionFalse,
+				}},
+			},
+		}
+
+		servingSecret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      rke2ServingSecretKey,
+				Namespace: metav1.NamespaceSystem,
+			},
+		}
+
+		connectionErr = interceptor.Funcs{
+			Get: func(ctx context.Context, client client.WithWatch, key client.ObjectKey, obj client.Object, _ ...client.GetOption) error {
+				return errors.New("test connection error")
+			},
+		}
+	})
+
+	AfterEach(func() {
+		testEnv.Cleanup(ctx, ns)
+	})
+
+	It("should set HasRKE2ServingSecret if servingSecret found", func() {
+		fakeClient := fake.NewClientBuilder().WithObjects([]client.Object{servingSecret}...).Build()
+		w := &Workload{
+			Client: fakeClient,
+			Nodes: map[string]*corev1.Node{
+				node1.Name: node1,
+				node2.Name: node2,
+			},
+		}
+		status := w.ClusterStatus(ctx)
+		Expect(status.Nodes).To(BeEquivalentTo(2), "There are 2 nodes in this cluster")
+		Expect(status.ReadyNodes).To(BeEquivalentTo(1), "Only 1 node has the NodeReady condition")
+		Expect(status.HasRKE2ServingSecret).To(BeTrue(), "rke2-serving Secret exists in kube-system namespace")
+	})
+	It("should not set HasRKE2ServingSecret if servingSecret not existing", func() {
+		fakeClient := fake.NewClientBuilder().Build()
+		w := &Workload{
+			Client: fakeClient,
+			Nodes: map[string]*corev1.Node{
+				node1.Name: node1,
+				node2.Name: node2,
+			},
+		}
+		status := w.ClusterStatus(ctx)
+		Expect(status.Nodes).To(BeEquivalentTo(2), "There are 2 nodes in this cluster")
+		Expect(status.ReadyNodes).To(BeEquivalentTo(1), "Only 1 node has the NodeReady condition")
+		Expect(status.HasRKE2ServingSecret).To(BeFalse(), "rke2-serving Secret does not exists in kube-system namespace")
+	})
+	It("should not set HasRKE2ServingSecret if client returns error", func() {
+		fakeClient := fake.NewClientBuilder().WithInterceptorFuncs(connectionErr).Build()
+		w := &Workload{
+			Client: fakeClient,
+			Nodes: map[string]*corev1.Node{
+				node1.Name: node1,
+				node2.Name: node2,
+			},
+		}
+		status := w.ClusterStatus(ctx)
+		Expect(status.Nodes).To(BeEquivalentTo(2), "There are 2 nodes in this cluster")
+		Expect(status.ReadyNodes).To(BeEquivalentTo(1), "Only 1 node has the NodeReady condition")
+		Expect(status.HasRKE2ServingSecret).To(BeFalse(), "On connection error assume control plane not initialized")
 	})
 })

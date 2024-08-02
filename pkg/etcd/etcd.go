@@ -28,7 +28,7 @@ import (
 	"google.golang.org/grpc"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/proxy"
+	"github.com/rancher/cluster-api-provider-rke2/pkg/proxy"
 )
 
 // GRPCDial is a function that creates a connection to a given endpoint.

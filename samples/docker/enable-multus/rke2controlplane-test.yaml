@@ -5,8 +5,7 @@ metadata:
   namespace: webhook-test
 spec: 
   replicas: 3
-  agentConfig:
-    version: v1.24.11+rke2r1
+  version: v1.24.11+rke2r1
   serverConfig:
     cniMultusEnable: true
   infrastructureRef:

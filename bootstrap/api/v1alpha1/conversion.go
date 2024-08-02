@@ -21,7 +21,10 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
-	bootstrapv1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1beta1"
+	apiconversion "k8s.io/apimachinery/pkg/conversion"
+
+	bootstrapv1 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta1"
+	utilconversion "sigs.k8s.io/cluster-api/util/conversion"
 )
 
 func (src *RKE2Config) ConvertTo(dstRaw conversion.Hub) error {
@@ -32,6 +35,16 @@ func (src *RKE2Config) ConvertTo(dstRaw conversion.Hub) error {
 
 	if err := Convert_v1alpha1_RKE2Config_To_v1beta1_RKE2Config(src, dst, nil); err != nil {
 		return err
+	}
+
+	// Manually restore data.
+	restored := &bootstrapv1.RKE2Config{}
+	if ok, err := utilconversion.UnmarshalData(src, restored); err != nil || !ok {
+		return err
+	}
+
+	if restored.Spec.AgentConfig.AirGappedChecksum != "" {
+		dst.Spec.AgentConfig.AirGappedChecksum = restored.Spec.AgentConfig.AirGappedChecksum
 	}
 
 	return nil
@@ -47,7 +60,8 @@ func (dst *RKE2Config) ConvertFrom(srcRaw conversion.Hub) error {
 		return err
 	}
 
-	return nil
+	// Preserve Hub data on down-conversion except for metadata
+	return utilconversion.MarshalData(src, dst)
 }
 
 func (src *RKE2ConfigList) ConvertTo(dstRaw conversion.Hub) error {
@@ -78,6 +92,16 @@ func (src *RKE2ConfigTemplate) ConvertTo(dstRaw conversion.Hub) error {
 		return err
 	}
 
+	// Manually restore data.
+	restored := &bootstrapv1.RKE2ConfigTemplate{}
+	if ok, err := utilconversion.UnmarshalData(src, restored); err != nil || !ok {
+		return err
+	}
+
+	if restored.Spec.Template.Spec.AgentConfig.AirGappedChecksum != "" {
+		dst.Spec.Template.Spec.AgentConfig.AirGappedChecksum = restored.Spec.Template.Spec.AgentConfig.AirGappedChecksum
+	}
+
 	return nil
 }
 
@@ -91,7 +115,8 @@ func (dst *RKE2ConfigTemplate) ConvertFrom(srcRaw conversion.Hub) error {
 		return err
 	}
 
-	return nil
+	// Preserve Hub data on down-conversion except for metadata
+	return utilconversion.MarshalData(src, dst)
 }
 
 func (src *RKE2ConfigTemplateList) ConvertTo(dstRaw conversion.Hub) error {
@@ -110,4 +135,14 @@ func (dst *RKE2ConfigTemplateList) ConvertFrom(srcRaw conversion.Hub) error {
 	}
 
 	return Convert_v1beta1_RKE2ConfigTemplateList_To_v1alpha1_RKE2ConfigTemplateList(src, dst, nil)
+}
+
+func Convert_v1alpha1_RKE2AgentConfig_To_v1beta1_RKE2AgentConfig(in *RKE2AgentConfig, out *bootstrapv1.RKE2AgentConfig, s apiconversion.Scope) error {
+	// We have to invoke conversion manually because of the removed RKE2Config.Spec.Version field.
+	return autoConvert_v1alpha1_RKE2AgentConfig_To_v1beta1_RKE2AgentConfig(in, out, s)
+}
+
+func Convert_v1beta1_RKE2AgentConfig_To_v1alpha1_RKE2AgentConfig(in *bootstrapv1.RKE2AgentConfig, out *RKE2AgentConfig, s apiconversion.Scope) error {
+	// We have to invoke conversion manually because of the added AirGappedChecksum field.
+	return autoConvert_v1beta1_RKE2AgentConfig_To_v1alpha1_RKE2AgentConfig(in, out, s)
 }

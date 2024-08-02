@@ -56,5 +56,5 @@ type RKE2ConfigTemplateResource struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&RKE2ConfigTemplate{}, &RKE2ConfigTemplateList{})
+	objectTypes = append(objectTypes, &RKE2ConfigTemplate{}, &RKE2ConfigTemplateList{})
 }

@@ -43,8 +43,8 @@ metadata:
   namespace: ${CABPR_NAMESPACE}
 spec: 
   replicas: ${CABPR_CP_REPLICAS}
+  version: ${KUBERNETES_VERSION}+rke2r1
   agentConfig:
-    version: ${KUBERNETES_VERSION}+rke2r1
     cisProfile: ${CIS_PROFILE}
   infrastructureRef:
     apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
@@ -74,7 +74,7 @@ spec:
       cluster.x-k8s.io/cluster-name: ${CLUSTER_NAME}
   template:
     spec:
-      version: ${KUBERNETES_VERSION}
+      version: ${KUBERNETES_VERSION}+rke2r1
       clusterName: ${CLUSTER_NAME}
       bootstrap:
         configRef:
@@ -106,7 +106,6 @@ spec:
   template:
     spec:
       agentConfig:
-        version: ${KUBERNETES_VERSION}+rke2r1
         cisProfile: ${CIS_PROFILE}
 ---
 apiVersion: v1

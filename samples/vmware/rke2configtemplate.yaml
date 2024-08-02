@@ -10,7 +10,6 @@ spec:
       preRKE2Commands:
         - sleep 30 # fix to give OS time to become ready
       agentConfig:
-        version: ${RKE2_VERSION}
         kubelet:
           extraArgs:
             - "--cloud-provider=external"

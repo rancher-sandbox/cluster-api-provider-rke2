@@ -76,7 +76,6 @@ spec:
     name: ${CLUSTER_NAME}-controlplane
   replicas: 1
   agentConfig:
-    version: ${KUBERNETES_VERSION}+rke2r1
     kubelet:
       extraArgs:
         - provider-id=metal3://{{ ds.meta_data.uuid }}

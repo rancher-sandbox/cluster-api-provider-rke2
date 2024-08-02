@@ -10,7 +10,7 @@
 1. Clone the repository locally: 
 
 ```bash
-git clone git@github.com:rancher-sandbox/cluster-api-provider-rke2.git
+git clone git@github.com:rancher/cluster-api-provider-rke2.git
 ```
 
 2. Depending on whether you are cutting a minor or patch release, the process varies.
@@ -20,7 +20,7 @@ git clone git@github.com:rancher-sandbox/cluster-api-provider-rke2.git
         Create a new release branch (i.e release-X) and push it to the upstream repository.
 
         ```bash
-            # Note: `upstream` must be the remote pointing to `github.com:rancher-sandbox/cluster-api-provider-rke2`.
+            # Note: `upstream` must be the remote pointing to `github.com:rancher/cluster-api-provider-rke2`.
             git checkout -b release-0.2
             git push -u upstream release-0.2
             # Export the tag of the minor release to be cut, e.g.:
@@ -45,7 +45,7 @@ git tag -s -a ${RELEASE_TAG} -m ${RELEASE_TAG}
 git push upstream ${RELEASE_TAG}
 ```
 
-This will trigger a [release GitHub action](https://github.com/rancher-sandbox/cluster-api-provider-rke2/blob/main/.github/workflows/release.yml) that creates a release with RKE2 provider components.
+This will trigger a [release GitHub action](https://github.com/rancher/cluster-api-provider-rke2/blob/main/.github/workflows/release.yml) that creates a release with RKE2 provider components.
 
 ## Versioning
 

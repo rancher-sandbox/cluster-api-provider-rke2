@@ -122,8 +122,8 @@ spec:
   nodeDrainTimeout: 2m
   preRKE2Commands:
     - sleep 30 #fix to give OS time to become ready
-  agentConfig:    
-    version: ${RKE2_VERSION}
+  version: ${RKE2_VERSION}
+  agentConfig:
     kubelet:
       extraArgs:
         - "--cloud-provider=external"

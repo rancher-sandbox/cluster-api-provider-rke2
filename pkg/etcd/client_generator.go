@@ -28,7 +28,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/rest"
 
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/proxy"
+	"github.com/rancher/cluster-api-provider-rke2/pkg/proxy"
 )
 
 const etcdPort = 2379

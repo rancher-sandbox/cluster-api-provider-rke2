@@ -54,6 +54,41 @@ runcmd:
 	})
 })
 
+var _ = Describe("WorkerAirGappedWithChecksumCloudInitTest", func() {
+	var input *BaseUserData
+
+	BeforeEach(func() {
+		input = &BaseUserData{
+			AirGapped:         true,
+			AirGappedChecksum: "abcd",
+		}
+	})
+	It("Should use the image embedded install.sh method and check the checksum first", func() {
+		workerCloudInitData, err := NewJoinWorker(input)
+		Expect(err).ToNot(HaveOccurred())
+		workerCloudInitString := string(workerCloudInitData)
+		_, err = GinkgoWriter.Write(workerCloudInitData)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(workerCloudInitString).To(Equal(`## template: jinja
+#cloud-config
+
+write_files:
+-   path: 
+    content: |
+      
+
+
+runcmd:
+  - [[ $(sha256sum /opt/rke2-artifacts/sha256sum*.txt | awk '{print $1}') == abcd ]] || exit 1
+  - 'INSTALL_RKE2_ARTIFACT_PATH=/opt/rke2-artifacts INSTALL_RKE2_TYPE="agent" sh /opt/install.sh'
+  - 'systemctl enable rke2-agent.service'
+  - 'systemctl start rke2-agent.service'
+  - 'mkdir -p /run/cluster-api'
+  - 'echo success > /run/cluster-api/bootstrap-success.complete'
+`))
+	})
+})
+
 var _ = Describe("WorkerOnlineCloudInitTest", func() {
 	var input *BaseUserData
 

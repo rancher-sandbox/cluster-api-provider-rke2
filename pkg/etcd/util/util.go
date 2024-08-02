@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/etcd"
+	"github.com/rancher/cluster-api-provider-rke2/pkg/etcd"
 )
 
 // MemberForName returns the etcd member with the matching name.

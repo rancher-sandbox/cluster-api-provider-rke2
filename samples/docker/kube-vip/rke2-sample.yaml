@@ -46,8 +46,7 @@ metadata:
   namespace: ${CABPR_NAMESPACE}
 spec: 
   replicas: ${CABPR_CP_REPLICAS}
-  agentConfig:
-    version: ${KUBERNETES_VERSION}+rke2r1
+  version: ${KUBERNETES_VERSION}+rke2r1
   serverConfig:
     cni: calico
   infrastructureRef:
@@ -118,7 +117,7 @@ spec:
       cluster.x-k8s.io/cluster-name: ${CLUSTER_NAME}
   template:
     spec:
-      version: ${KUBERNETES_VERSION}
+      version: ${KUBERNETES_VERSION}+rke2r1
       clusterName: ${CLUSTER_NAME}
       bootstrap:
         configRef:
@@ -149,8 +148,7 @@ metadata:
 spec: 
   template:
     spec:
-      agentConfig:
-        version: ${KUBERNETES_VERSION}+rke2r1
+      agentConfig: {}
 ---
 apiVersion: v1
 kind: ConfigMap

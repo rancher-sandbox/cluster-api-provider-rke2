@@ -20,8 +20,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
-	bootstrapv1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1beta1"
-	bsutil "github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/util"
+	bootstrapv1 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta1"
+	bsutil "github.com/rancher/cluster-api-provider-rke2/pkg/util"
 )
 
 const (
@@ -29,6 +29,9 @@ const (
 	DefaultRKE2RegistriesLocation string = "/etc/rancher/rke2/registries.yaml"
 
 	registryCertsPath string = "/etc/rancher/rke2/tls"
+	cacert            string = "ca.crt"
+	tlskey            string = "tls.key"
+	tlscert           string = "tls.crt"
 )
 
 // GenerateRegistries generates the registries.yaml file and the corresponding
@@ -69,24 +72,28 @@ func GenerateRegistries(rke2ConfigRegistry RegistryScope) (*Registry, []bootstra
 				return &Registry{}, []bootstrapv1.File{}, err
 			}
 
-			for _, secretEntry := range []string{"tls.crt", "tls.key", "ca.crt"} {
-				if tlsSecret.Data[secretEntry] == nil {
-					rke2ConfigRegistry.Logger.Error(err, "TLS Secret for the registry is missing entries!", "secret-missing-entry", secretEntry)
+			registryConfig.TLS = &TLSConfig{}
 
-					return &Registry{}, []bootstrapv1.File{}, err
+			for _, secretEntry := range []string{tlscert, tlskey, cacert} {
+				if tlsSecret.Data[secretEntry] != nil {
+					files = append(files, bootstrapv1.File{
+						Path:    registryCertsPath + "/" + secretEntry,
+						Content: string(tlsSecret.Data[secretEntry]),
+					})
+
+					switch secretEntry {
+					case tlscert:
+						registryConfig.TLS.CertFile = registryCertsPath + "/" + tlscert
+					case tlskey:
+						registryConfig.TLS.KeyFile = registryCertsPath + "/" + tlskey
+					case cacert:
+						registryConfig.TLS.CAFile = registryCertsPath + "/" + cacert
+					}
 				}
-
-				files = append(files, bootstrapv1.File{
-					Path:    registryCertsPath + "/" + secretEntry,
-					Content: string(tlsSecret.Data[secretEntry]),
-				})
 			}
 
-			registryConfig.TLS = &TLSConfig{
-				InsecureSkipVerify: regConfig.TLS.InsecureSkipVerify,
-				CAFile:             registryCertsPath + "/" + "ca.crt",
-				CertFile:           registryCertsPath + "/" + "tls.crt",
-				KeyFile:            registryCertsPath + "/" + "tls.key",
+			if regConfig.TLS.InsecureSkipVerify {
+				registryConfig.TLS.InsecureSkipVerify = regConfig.TLS.InsecureSkipVerify
 			}
 		}
 

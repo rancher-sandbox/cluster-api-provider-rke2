@@ -2,7 +2,7 @@ domain: cluster.x-k8s.io
 layout:
 - go.kubebuilder.io/v3
 projectName: controlplane
-repo: github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane
+repo: github.com/rancher/cluster-api-provider-rke2/controlplane
 resources:
 - api:
     crdVersion: v1
@@ -11,7 +11,7 @@ resources:
   domain: cluster.x-k8s.io
   group: controlplane
   kind: Rke2ControlPlane
-  path: github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1alpha1
+  path: github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1alpha1
   version: v1alpha1
   webhooks:
     defaulting: true
@@ -23,7 +23,7 @@ resources:
   domain: cluster.x-k8s.io
   group: controlplane
   kind: Rke2ControlPlaneTemplate
-  path: github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1alpha1
+  path: github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1alpha1
   version: v1alpha1
   webhooks:
     defaulting: true

@@ -22,9 +22,9 @@ import (
 	apiconversion "k8s.io/apimachinery/pkg/conversion"
 	utilconversion "sigs.k8s.io/cluster-api/util/conversion"
 
-	bootstrapv1beta1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1beta1"
-	bootstrapv1alpha1 "github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1alpha1"
-	controlplanev1 "github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane/api/v1beta1"
+	bootstrapv1beta1 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta1"
+	bootstrapv1alpha1 "github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1alpha1"
+	controlplanev1 "github.com/rancher/cluster-api-provider-rke2/controlplane/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 )
 
@@ -37,14 +37,23 @@ func (src *RKE2ControlPlane) ConvertTo(dstRaw conversion.Hub) error {
 		return err
 	}
 
+	dst.Spec.Version = src.Spec.AgentConfig.Version
+
 	// Manually restore data.
 	restored := &controlplanev1.RKE2ControlPlane{}
 	if ok, err := utilconversion.UnmarshalData(src, restored); err != nil || !ok {
 		return err
 	}
 
+	if restored.Spec.Version != "" {
+		dst.Spec.Version = restored.Spec.Version
+	}
+
+	if restored.Spec.AgentConfig.AirGappedChecksum != "" {
+		dst.Spec.AgentConfig.AirGappedChecksum = restored.Spec.AgentConfig.AirGappedChecksum
+	}
+
 	dst.Spec.MachineTemplate = restored.Spec.MachineTemplate
-	dst.Spec.Version = restored.Spec.Version
 	dst.Status = restored.Status
 
 	return nil
@@ -59,6 +68,8 @@ func (dst *RKE2ControlPlane) ConvertFrom(srcRaw conversion.Hub) error {
 	if err := Convert_v1beta1_RKE2ControlPlane_To_v1alpha1_RKE2ControlPlane(src, dst, nil); err != nil {
 		return err
 	}
+
+	dst.Spec.AgentConfig.Version = src.Spec.Version
 
 	// Preserve Hub data on down-conversion
 	if err := utilconversion.MarshalData(src, dst); err != nil {
@@ -108,6 +119,10 @@ func (src *RKE2ControlPlaneTemplate) ConvertTo(dstRaw conversion.Hub) error {
 	restored := &controlplanev1.RKE2ControlPlaneTemplate{}
 	if ok, err := utilconversion.UnmarshalData(src, restored); err != nil || !ok {
 		return err
+	}
+
+	if restored.Spec.Template.Spec.AgentConfig.AirGappedChecksum != "" {
+		dst.Spec.Template.Spec.AgentConfig.AirGappedChecksum = restored.Spec.Template.Spec.AgentConfig.AirGappedChecksum
 	}
 
 	dst.Spec.Template = restored.Spec.Template

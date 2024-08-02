@@ -52,7 +52,7 @@ export KREW_ROOT := $(abspath $(TOOLS_BIN_DIR))
 export PATH := $(KREW_ROOT)/bin:$(PATH)
 
 # Set --output-base for conversion-gen if we are not within GOPATH
-ifneq ($(abspath $(ROOT_DIR)),$(shell go env GOPATH)/src/github.com/rancher-sandbox/cluster-api-provider-rke2)
+ifneq ($(abspath $(ROOT_DIR)),$(shell go env GOPATH)/src/github.com/rancher/cluster-api-provider-rke2)
 	CONVERSION_GEN_OUTPUT_BASE_CAPRKE2 := --output-dir=$(ROOT_DIR)/$(CAPRKE2_DIR)
 	CONVERSION_GEN_OUTPUT_BASE_CAPBPR := --output-dir=$(ROOT_DIR)/$(CAPBPR_DIR)
 else
@@ -101,7 +101,7 @@ GOLANGCI_LINT_VER := v1.55.1
 GOLANGCI_LINT_BIN := golangci-lint
 GOLANGCI_LINT := $(abspath $(TOOLS_BIN_DIR)/$(GOLANGCI_LINT_BIN))
 
-GINKGO_VER := v2.16.0
+GINKGO_VER := v2.17.1
 GINKGO_BIN := ginkgo
 GINKGO := $(abspath $(TOOLS_BIN_DIR)/$(GINKGO_BIN)-$(GINKGO_VER))
 GINKGO_PKG := github.com/onsi/ginkgo/v2/ginkgo
@@ -115,7 +115,7 @@ TAG ?= dev
 ARCH ?= $(shell go env GOARCH)
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 REGISTRY ?= ghcr.io
-ORG ?= rancher-sandbox
+ORG ?= rancher
 CONTROLLER_IMAGE_NAME := cluster-api-provider-rke2
 BOOTSTRAP_IMAGE_NAME := $(CONTROLLER_IMAGE_NAME)-bootstrap
 CONTROLPLANE_IMAGE_NAME = $(CONTROLLER_IMAGE_NAME)-controlplane
@@ -158,6 +158,7 @@ generate-manifests: $(addprefix generate-manifests-,$(ALL_GENERATE_MODULES)) ## 
 generate-manifests-rke2-bootstrap: $(CONTROLLER_GEN) ## Generate manifests e.g. CRD, RBAC etc. for rke2 bootstrap provider
 	$(MAKE) clean-generated-yaml SRC_DIRS="./bootstrap/config/crd/bases"
 	$(CONTROLLER_GEN) \
+		paths=./bootstrap \
 		paths=./bootstrap/api/... \
 		paths=./bootstrap/internal/controllers/... \
 		crd:crdVersions=v1 \
@@ -171,6 +172,7 @@ generate-manifests-rke2-bootstrap: $(CONTROLLER_GEN) ## Generate manifests e.g. 
 generate-manifests-rke2-control-plane: $(CONTROLLER_GEN) ## Generate manifests e.g. CRD, RBAC etc. for RKE2 control plane provider
 	$(MAKE) clean-generated-yaml SRC_DIRS="./controlplane/config/crd/bases"
 	$(CONTROLLER_GEN) \
+		paths=./controlplane \
 		paths=./controlplane/api/... \
 		paths=./controlplane/internal/controllers/... \
 		paths=./controlplane/internal/webhooks/... \
@@ -216,7 +218,7 @@ generate-go-conversions-rke2-bootstrap: $(CONVERSION_GEN) ## Generate conversion
 generate-go-conversions-rke2-control-plane: $(CONVERSION_GEN) ## Generate conversions go code for the rke2 control plane
 	$(MAKE) clean-generated-conversions SRC_DIRS="./controlplane/api/v1alpha1"
 	$(CONVERSION_GEN) \
-		--extra-dirs=github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1alpha1 \
+		--extra-dirs=github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1alpha1 \
 		--output-file=zz_generated.conversion.go $(ROOT_DIR)/$(CAPRKE2_DIR) \
 		--go-header-file=./hack/boilerplate.go.txt \
 		./controlplane/api/v1alpha1
@@ -295,11 +297,11 @@ managers: $(addprefix manager-,$(ALL_MANAGERS)) ## Run all manager-* targets
 
 .PHONY: manager-rke2-bootstrap
 manager-rke2-bootstrap: ## Build the rke2 bootstrap manager binary into the ./bin folder
-	go build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/rke2-bootstrap-manager github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap
+	go build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/rke2-bootstrap-manager github.com/rancher/cluster-api-provider-rke2/bootstrap
 
 .PHONY: manager-rke2-control-plane
 manager-rke2-control-plane: ## Build the rke2 control plane manager binary into the ./bin folder
-	go build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/rke2-control-plane-manager github.com/rancher-sandbox/cluster-api-provider-rke2/controlplane
+	go build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/rke2-control-plane-manager github.com/rancher/cluster-api-provider-rke2/controlplane
 
 .PHONY: docker-pull-prerequisites
 docker-pull-prerequisites:
@@ -496,7 +498,7 @@ release-manifests: $(RELEASE_DIR) $(KUSTOMIZE) ## Build the manifests to publish
 .PHONY: release-notes
 release-notes: $(RELEASE_DIR) $(GH)
 	if [ -n "${PRE_RELEASE}" ]; then \
-	echo ":rotating_light: This is a RELEASE CANDIDATE. Use it only for testing purposes. If you find any bugs, file an [issue](https://github.com/rancher-sandbox/cluster-api-provider-rke2/issues/new)." > $(RELEASE_DIR)/CHANGELOG.md; \
+	echo ":rotating_light: This is a RELEASE CANDIDATE. Use it only for testing purposes. If you find any bugs, file an [issue](https://github.com/rancher/cluster-api-provider-rke2/issues/new)." > $(RELEASE_DIR)/CHANGELOG.md; \
 	else \
 	$(GH) api repos/$(ORG)/$(GH_REPO_NAME)/releases/generate-notes -F tag_name=$(VERSION) -F previous_tag_name=$(PREVIOUS_VERSION) --jq '.body' > $(RELEASE_DIR)/CHANGELOG.md; \
 	fi

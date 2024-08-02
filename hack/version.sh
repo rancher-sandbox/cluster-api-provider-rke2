@@ -85,7 +85,7 @@ version::ldflags() {
         local key=${1}
         local val=${2}
         ldflags+=(
-            "-X 'github.com/rancher-sandbox/cluster-api-provider-rke2/version.${key}=${val}'"
+            "-X 'github.com/rancher/cluster-api-provider-rke2/version.${key}=${val}'"
         )
     }
 

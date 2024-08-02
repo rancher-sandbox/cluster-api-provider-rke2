@@ -38,7 +38,7 @@ import (
 	"sigs.k8s.io/cluster-api/util/certs"
 	"sigs.k8s.io/cluster-api/util/collections"
 
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/secret"
+	"github.com/rancher/cluster-api-provider-rke2/pkg/secret"
 )
 
 const (

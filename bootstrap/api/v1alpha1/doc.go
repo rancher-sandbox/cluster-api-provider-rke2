@@ -16,6 +16,6 @@ limitations under the License.
 
 // Package v1alpha1 contains a v1alpha1 api for bootstrap resources.
 //
-// +k8s:conversion-gen=github.com/rancher-sandbox/cluster-api-provider-rke2/bootstrap/api/v1beta1
+// +k8s:conversion-gen=github.com/rancher/cluster-api-provider-rke2/bootstrap/api/v1beta1
 // +k8s:deepcopy-gen=package
 package v1alpha1

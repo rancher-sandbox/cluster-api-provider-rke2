@@ -631,6 +631,12 @@ spec:
                               AirGapped is a boolean value to define if the bootstrapping should be air-gapped,
                               basically supposing that online container registries and RKE2 install scripts are not reachable.
                             type: boolean
+                          airGappedChecksum:
+                            description: |-
+                              AirGappedChecksum is a string value with a sha256sum checksum to compare with checksum
+                              of existing sha256sum-<arch>.txt file for packages already available on the machine
+                              before performing air-gapped installation.
+                            type: string
                           cisProfile:
                             description: CISProfile activates CIS compliance of RKE2
                               for a certain profile
@@ -872,12 +878,6 @@ spec:
                           systemDefaultRegistry:
                             description: SystemDefaultRegistry Private registry to
                               be used for all system images.
-                            type: string
-                          version:
-                            description: |-
-                              Version specifies the rke2 version.
-                              This field will be deprecated in newer versions of the API and RKE2ControlPlaneSpec.Version will be used instead.
-                            pattern: v(\d\.\d{2}\.\d)\+rke2r\d
                             type: string
                         type: object
                       files:

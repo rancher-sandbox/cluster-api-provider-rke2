@@ -24,7 +24,7 @@ import (
 
 	"github.com/blang/semver/v4"
 	. "github.com/onsi/gomega"
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/etcd"
+	"github.com/rancher/cluster-api-provider-rke2/pkg/etcd"
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	appsv1 "k8s.io/api/apps/v1"
@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	etcdfake "github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/etcd/fake"
+	etcdfake "github.com/rancher/cluster-api-provider-rke2/pkg/etcd/fake"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 

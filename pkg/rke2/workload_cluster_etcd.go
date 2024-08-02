@@ -28,7 +28,7 @@ import (
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 
-	etcdutil "github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/etcd/util"
+	etcdutil "github.com/rancher/cluster-api-provider-rke2/pkg/etcd/util"
 )
 
 // ReconcileEtcdMembers iterates over all etcd members and finds members that do not have corresponding nodes.

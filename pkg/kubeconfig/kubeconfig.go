@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/certs"
 
-	"github.com/rancher-sandbox/cluster-api-provider-rke2/pkg/secret"
+	"github.com/rancher/cluster-api-provider-rke2/pkg/secret"
 )
 
 // ErrDependentCertificateNotFound is returned when the kubeconfig cannot be generated because the

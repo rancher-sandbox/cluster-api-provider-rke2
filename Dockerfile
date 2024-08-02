@@ -44,7 +44,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Production image
 FROM gcr.io/distroless/static:nonroot-${ARCH}
-LABEL org.opencontainers.image.source=https://github.com/rancher-sandbox/cluster-api-provider-rke2
+LABEL org.opencontainers.image.source=https://github.com/rancher/cluster-api-provider-rke2
 WORKDIR /
 COPY --from=builder /workspace/manager .
 # Use uid of nonroot user (65532) because kubernetes expects numeric user when applying pod security policies

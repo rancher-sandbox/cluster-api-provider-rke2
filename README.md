@@ -1,6 +1,6 @@
 # Cluster API Provider RKE2
 
-![GitHub](https://img.shields.io/github/license/rancher-sandbox/cluster-api-provider-rke2)
+![GitHub](https://img.shields.io/github/license/rancher/cluster-api-provider-rke2)
 
 ------
 
@@ -71,10 +71,10 @@ With CAPI & clusterctl versions less than v1.6.0 you need a specific configurati
 ```yaml
 providers:
   - name: "rke2"
-    url: "https://github.com/rancher-sandbox/cluster-api-provider-rke2/releases/v0.1.1/bootstrap-components.yaml"
+    url: "https://github.com/rancher/cluster-api-provider-rke2/releases/v0.1.1/bootstrap-components.yaml"
     type: "BootstrapProvider"
   - name: "rke2"
-    url: "https://github.com/rancher-sandbox/cluster-api-provider-rke2/releases/v0.1.1/control-plane-components.yaml"
+    url: "https://github.com/rancher/cluster-api-provider-rke2/releases/v0.1.1/control-plane-components.yaml"
     type: "ControlPlaneProvider"
 ``` 
 > NOTE: Due to some issue related to how `CAPD` creates Load Balancer healthchecks, it is necessary to use a fork of `CAPD` by providing in the above configuration file the following :
@@ -260,7 +260,7 @@ These instructions are for development purposes initially and will be changed in
 
 > **Why clone into the GOPATH?** There have been historic issues with code generation tools when they are run outside the go path
 
-2. Fork the [Cluster API Provider RKE2](https://github.com/rancher-sandbox/cluster-api-provider-rke2) repo
+2. Fork the [Cluster API Provider RKE2](https://github.com/rancher/cluster-api-provider-rke2) repo
 3. Clone your new repo into the **GOPATH** (i.e. `~/go/src/github.com/yourname/cluster-api-provider-rke2`)
 4. Ensure **Tilt** and **kind** are installed
 5. Create a `tilt-settings.json` file in the root of your forked/cloned `cluster-api` directory.

@@ -22,7 +22,8 @@ spec:
         - /manager
         args:
         - "--leader-elect"
-        - "--metrics-bind-addr=localhost:8080"
+        - "--diagnostics-address=${CAPRKE2_DIAGNOSTICS_ADDRESS:=:8443}"
+        - "--insecure-diagnostics=${CAPRKE2_INSECURE_DIAGNOSTICS:=false}"
         image: controller:latest
         name: manager
         env:
@@ -41,6 +42,9 @@ spec:
         ports:
         - containerPort: 9440
           name: healthz
+          protocol: TCP
+        - containerPort: 8443
+          name: metrics
           protocol: TCP
         readinessProbe:
           httpGet:
