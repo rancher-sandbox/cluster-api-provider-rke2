@@ -79,6 +79,33 @@ spec:
       natGatewaysIPsSource: true
       protocol: tcp
       toPort: 2380
+    - description: Calico Typha
+      fromPort: 5473
+      protocol: tcp
+      toPort: 5473
+      sourceSecurityGroupRoles:
+      - node
+      - controlplane
+      - apiserver-lb
+      - lb
+    - description: Calico Typha health check
+      fromPort: 9098
+      protocol: tcp
+      toPort: 9098
+      sourceSecurityGroupRoles:
+      - node
+      - controlplane
+      - apiserver-lb
+      - lb
+    - description: Calico health check
+      fromPort: 9099
+      protocol: tcp
+      toPort: 9099
+      sourceSecurityGroupRoles:
+      - node
+      - controlplane
+      - apiserver-lb
+      - lb
     vpc:
       availabilityZoneUsageLimit: 1
   region: ${AWS_REGION}
