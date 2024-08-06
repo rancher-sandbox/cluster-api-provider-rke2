@@ -55,7 +55,7 @@ endif
 ## Platform and version combinations
 ## --------------------------------------
 
-AWS_BUILD_NAMES ?= aws-opensuse-leap-155
+AWS_BUILD_NAMES ?= aws-opensuse-leap-156
 
 ## --------------------------------------
 ## Dynamic build targets
@@ -71,5 +71,5 @@ $(AWS_BUILD_TARGETS):
 ## Document dynamic build targets
 ## --------------------------------------
 ##@ Builds
-build-aws-opensuse-leap-155: ## Builds an AMI for OpenSUSE Leap 15.5
+build-aws-opensuse-leap-156: ## Builds an AMI for OpenSUSE Leap 15.6
 build-aws-all: $(AWS_BUILD_TARGETS) ## Builds all AMIs
