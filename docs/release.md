@@ -47,6 +47,44 @@ git push upstream ${RELEASE_TAG}
 
 This will trigger a [release GitHub action](https://github.com/rancher/cluster-api-provider-rke2/blob/main/.github/workflows/release.yml) that creates a release with RKE2 provider components.
 
+## Tasks
+
+### Prepare main branch for development of the new release
+
+The goal of this task is to bump the versions on the main branch so that the upcoming release version is used for e.g. local development and e2e tests. We also modify tests so that they are testing the previous release.
+
+This comes down to changing occurrences of the old version to the new version, e.g. v1.5 to v1.6, and preparing `metadata.yaml` for a future release version:
+
+#### 1. Update E2E tests
+
+Existing E2E tests that point to a specific version need to be updated to use the new version instead.
+
+1. Add the new release to the list of providers in `test/e2e/config/e2e_conf.yaml` following the format used for previous versions.
+2. Update bootstrap/control plane versions* inside function `initUpgradableBootstrapCluster` in `test/e2e/e2e_suite_test.go`.
+3. Edit upgrade test* in `test/e2e/e2e_upgrade_test.go`.
+
+*To maintain the upgrade test concise and clean, and avoid a growing list of versions, it is required to maintain N-2 minor as starting version (e.g. if releasing version v4.x, starting version is v2.x and upgrade is as follows: v2.x -> v3.x -> v4.x).
+
+
+#### 2. Add future version to `metadata.yaml`. For example, if `v0.5` was just released, we add `v0.6` to the list of `releaseSeries`:
+```
+apiVersion: clusterctl.cluster.x-k8s.io/v1alpha3
+kind: Metadata
+releaseSeries:
+  - major: 0
+    minor: 1
+    contract: v1beta1
+  - major: 0
+    minor: 2
+    contract: v1beta1
+  ...
+  ...
+  ...
+  - major: x
+    minor: x
+    contract: x
+```
+
 ## Versioning
 
 Cluster API Provider RKE2 follows [semantic versioning](https://semver.org/) specification.
