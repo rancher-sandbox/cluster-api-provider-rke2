@@ -38,7 +38,7 @@ import (
 
 var _ = Describe("Workload cluster creation", func() {
 	var (
-		specName            = "create-workload-cluster"
+		specName            = "create-legacy-workload-cluster"
 		namespace           *corev1.Namespace
 		cancelWatches       context.CancelFunc
 		result              *ApplyClusterTemplateAndWaitResult

@@ -16,7 +16,7 @@
 
 .DEFAULT_GOAL := help
 
-RKE2_VERSION?=1.26.0+rke2r1
+RKE2_VERSION?=1.30.3+rke2r1
 
 ## --------------------------------------
 ## Help
