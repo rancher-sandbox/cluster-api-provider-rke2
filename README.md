@@ -66,15 +66,15 @@ clusterctl init --bootstrap rke2 --control-plane rke2 --infrastructure docker
 
 #### CAPI < v1.6.0
 
-With CAPI & clusterctl versions less than v1.6.0 you need a specific configuration. To do this create a file called `clusterctl.yaml` in the `$HOME/.cluster-api` folder with the following content:
+With CAPI & clusterctl versions less than v1.6.0 you need a specific configuration. To do this create a file called `clusterctl.yaml` in the `$HOME/.cluster-api` folder with the following content (substitute `${VERSION}` with a valid semver specification - e.g. v0.5.0 - from [releases](https://github.com/rancher/cluster-api-provider-rke2/releases)):
 
 ```yaml
 providers:
   - name: "rke2"
-    url: "https://github.com/rancher/cluster-api-provider-rke2/releases/v0.1.1/bootstrap-components.yaml"
+    url: "https://github.com/rancher/cluster-api-provider-rke2/releases/${VERSION}/bootstrap-components.yaml"
     type: "BootstrapProvider"
   - name: "rke2"
-    url: "https://github.com/rancher/cluster-api-provider-rke2/releases/v0.1.1/control-plane-components.yaml"
+    url: "https://github.com/rancher/cluster-api-provider-rke2/releases/${VERSION}/control-plane-components.yaml"
     type: "ControlPlaneProvider"
 ``` 
 > NOTE: Due to some issue related to how `CAPD` creates Load Balancer healthchecks, it is necessary to use a fork of `CAPD` by providing in the above configuration file the following :
