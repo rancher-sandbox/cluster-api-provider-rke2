@@ -99,6 +99,7 @@ metadata:
   name: ${CLUSTER_NAME}-control-plane
 spec: 
   replicas: ${CONTROL_PLANE_MACHINE_COUNT}
+  registrationMethod: internal-first
   agentConfig:
     version: ${KUBERNETES_VERSION}+rke2r1
     nodeAnnotations:

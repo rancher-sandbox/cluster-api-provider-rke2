@@ -35,8 +35,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.21.x
-      - name: Build e2e image
-        run: make e2e-image
       - name: Setup kind
         uses: helm/kind-action@v1.9.0
         with:

@@ -38,7 +38,7 @@ import (
 
 var _ = Describe("Workload cluster creation", func() {
 	var (
-		specName            = "create-workload-cluster"
+		specName            = "create-legacy-workload-cluster"
 		namespace           *corev1.Namespace
 		cancelWatches       context.CancelFunc
 		result              *ApplyClusterTemplateAndWaitResult
@@ -85,19 +85,20 @@ var _ = Describe("Workload cluster creation", func() {
 	})
 
 	Context("Creating a single control-plane cluster", func() {
-		It("Should create a cluster with v0.3.0 and perform upgrade to v0.5.0 version", func() {
-			By("Installing v0.3.0 boostrap/controlplane provider version")
-			initUpgradableBootstrapCluster(bootstrapClusterProxy, e2eConfig, clusterctlConfigPath, artifactFolder)
+		It("Should create a cluster with legacy version v0.2.7 and perform upgrade to the v0.3.0 version", func() {
+			By("Installing legacy boostrap/controlplane provider version")
+			initLegacyBootstrapCluster(bootstrapClusterProxy, e2eConfig, clusterctlConfigPath, artifactFolder)
 
 			By("Initializing the cluster")
 			ApplyClusterTemplateAndWait(ctx, ApplyClusterTemplateAndWaitInput{
+				Legacy:       true,
 				ClusterProxy: bootstrapClusterProxy,
 				ConfigCluster: clusterctl.ConfigClusterInput{
 					LogFolder:                clusterctlLogFolder,
 					ClusterctlConfigPath:     clusterctlConfigPath,
 					KubeconfigPath:           bootstrapClusterProxy.GetKubeconfigPath(),
 					InfrastructureProvider:   "docker",
-					Flavor:                   "docker",
+					Flavor:                   "docker-legacy",
 					Namespace:                namespace.Name,
 					ClusterName:              clusterName,
 					KubernetesVersion:        e2eConfig.GetVariable(KubernetesVersion),
@@ -109,48 +110,32 @@ var _ = Describe("Workload cluster creation", func() {
 				WaitForMachineDeployments:    e2eConfig.GetIntervals(specName, "wait-worker-nodes"),
 			}, result)
 
-			WaitForControlPlaneToBeReady(ctx, WaitForControlPlaneToBeReadyInput{
+			WaitForLegacyControlPlaneToBeReady(ctx, WaitForControlPlaneToBeReadyInput{
 				Getter:       bootstrapClusterProxy.GetClient(),
-				ControlPlane: client.ObjectKeyFromObject(result.ControlPlane),
+				ControlPlane: client.ObjectKeyFromObject(result.LegacyControlPlane),
 			}, e2eConfig.GetIntervals(specName, "wait-control-plane")...)
 
-			By("Upgrading to v0.4.0 boostrap/controlplane provider version")
+			By("Upgrading to v0.3.0 boostrap/controlplane provider version")
 			clusterctl.UpgradeManagementClusterAndWait(ctx, clusterctl.UpgradeManagementClusterAndWaitInput{
 				ClusterProxy:          bootstrapClusterProxy,
 				ClusterctlConfigPath:  clusterctlConfigPath,
-				BootstrapProviders:    []string{"rke2-bootstrap:v0.4.0"},
-				ControlPlaneProviders: []string{"rke2-control-plane:v0.4.0"},
+				BootstrapProviders:    []string{"rke2-bootstrap:v0.3.0"},
+				ControlPlaneProviders: []string{"rke2-control-plane:v0.3.0"},
 				LogFolder:             clusterctlLogFolder,
 			}, e2eConfig.GetIntervals(specName, "wait-controllers")...)
 
-			WaitForControlPlaneToBeReady(ctx, WaitForControlPlaneToBeReadyInput{
-				Getter:       bootstrapClusterProxy.GetClient(),
-				ControlPlane: client.ObjectKeyFromObject(result.ControlPlane),
-			}, e2eConfig.GetIntervals(specName, "wait-control-plane")...)
-
-			By("Upgrading to current boostrap/controlplane provider version")
-			clusterctl.UpgradeManagementClusterAndWait(ctx, clusterctl.UpgradeManagementClusterAndWaitInput{
-				ClusterProxy:          bootstrapClusterProxy,
-				ClusterctlConfigPath:  clusterctlConfigPath,
-				BootstrapProviders:    []string{"rke2-bootstrap:v0.5.99"},
-				ControlPlaneProviders: []string{"rke2-control-plane:v0.5.99"},
-				LogFolder:             clusterctlLogFolder,
-			}, e2eConfig.GetIntervals(specName, "wait-controllers")...)
-
-			WaitForControlPlaneToBeReady(ctx, WaitForControlPlaneToBeReadyInput{
-				Getter:       bootstrapClusterProxy.GetClient(),
-				ControlPlane: client.ObjectKeyFromObject(result.ControlPlane),
-			}, e2eConfig.GetIntervals(specName, "wait-control-plane")...)
-
-			By("Scaling down control plane to 2 and workers up to 2")
+			// At this point provider does not have an etcd secret, as a new node was never rolled out
+			// and the cluster was created in the old version. Should still be possible to do.
+			By("Scaling down control plane to 2 and workers up to 2 using v1apha1")
 			ApplyClusterTemplateAndWait(ctx, ApplyClusterTemplateAndWaitInput{
+				Legacy:       true,
 				ClusterProxy: bootstrapClusterProxy,
 				ConfigCluster: clusterctl.ConfigClusterInput{
 					LogFolder:                clusterctlLogFolder,
 					ClusterctlConfigPath:     clusterctlConfigPath,
 					KubeconfigPath:           bootstrapClusterProxy.GetKubeconfigPath(),
 					InfrastructureProvider:   "docker",
-					Flavor:                   "docker",
+					Flavor:                   "docker-legacy",
 					Namespace:                namespace.Name,
 					ClusterName:              clusterName,
 					KubernetesVersion:        e2eConfig.GetVariable(KubernetesVersion),
@@ -162,12 +147,47 @@ var _ = Describe("Workload cluster creation", func() {
 				WaitForMachineDeployments:    e2eConfig.GetIntervals(specName, "wait-worker-nodes"),
 			}, result)
 
+			WaitForLegacyControlPlaneToBeReady(ctx, WaitForControlPlaneToBeReadyInput{
+				Getter:       bootstrapClusterProxy.GetClient(),
+				ControlPlane: client.ObjectKeyFromObject(result.LegacyControlPlane),
+			}, e2eConfig.GetIntervals(specName, "wait-control-plane")...)
+
+			// Possible only with valid etcd certificate in the secret
+			// Created machine is a scale up, so the secret will be populated for the
+			// remaning 2 machines to scale down to 1 later
+			By("Upgrading control plane and worker machines using v1beta1")
+			ApplyClusterTemplateAndWait(ctx, ApplyClusterTemplateAndWaitInput{
+				ClusterProxy: bootstrapClusterProxy,
+				ConfigCluster: clusterctl.ConfigClusterInput{
+					LogFolder:                clusterctlLogFolder,
+					ClusterctlConfigPath:     clusterctlConfigPath,
+					KubeconfigPath:           bootstrapClusterProxy.GetKubeconfigPath(),
+					InfrastructureProvider:   "docker",
+					Flavor:                   "docker",
+					Namespace:                namespace.Name,
+					ClusterName:              clusterName,
+					KubernetesVersion:        e2eConfig.GetVariable(KubernetesVersionUpgradeTo),
+					ControlPlaneMachineCount: ptr.To(int64(2)),
+					WorkerMachineCount:       ptr.To(int64(1)),
+				},
+				WaitForClusterIntervals:      e2eConfig.GetIntervals(specName, "wait-cluster"),
+				WaitForControlPlaneIntervals: e2eConfig.GetIntervals(specName, "wait-control-plane"),
+				WaitForMachineDeployments:    e2eConfig.GetIntervals(specName, "wait-worker-nodes"),
+			}, result)
+
+			WaitForClusterToUpgrade(ctx, WaitForClusterToUpgradeInput{
+				Lister:              bootstrapClusterProxy.GetClient(),
+				ControlPlane:        result.ControlPlane,
+				MachineDeployments:  result.MachineDeployments,
+				VersionAfterUpgrade: e2eConfig.GetVariable(KubernetesVersionUpgradeTo),
+			}, e2eConfig.GetIntervals(specName, "wait-control-plane")...)
+
 			WaitForControlPlaneToBeReady(ctx, WaitForControlPlaneToBeReadyInput{
 				Getter:       bootstrapClusterProxy.GetClient(),
 				ControlPlane: client.ObjectKeyFromObject(result.ControlPlane),
 			}, e2eConfig.GetIntervals(specName, "wait-control-plane")...)
 
-			By("Scale down control plane and workers to 1")
+			By("Scale down CP and workers to 1")
 			ApplyClusterTemplateAndWait(ctx, ApplyClusterTemplateAndWaitInput{
 				ClusterProxy: bootstrapClusterProxy,
 				ConfigCluster: clusterctl.ConfigClusterInput{
@@ -186,13 +206,6 @@ var _ = Describe("Workload cluster creation", func() {
 				WaitForControlPlaneIntervals: e2eConfig.GetIntervals(specName, "wait-control-plane"),
 				WaitForMachineDeployments:    e2eConfig.GetIntervals(specName, "wait-worker-nodes"),
 			}, result)
-
-			WaitForClusterToUpgrade(ctx, WaitForClusterToUpgradeInput{
-				Lister:              bootstrapClusterProxy.GetClient(),
-				ControlPlane:        result.ControlPlane,
-				MachineDeployments:  result.MachineDeployments,
-				VersionAfterUpgrade: e2eConfig.GetVariable(KubernetesVersionUpgradeTo),
-			}, e2eConfig.GetIntervals(specName, "wait-control-plane")...)
 
 			WaitForControlPlaneToBeReady(ctx, WaitForControlPlaneToBeReadyInput{
 				Getter:       bootstrapClusterProxy.GetClient(),
