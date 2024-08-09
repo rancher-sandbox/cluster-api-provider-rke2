@@ -280,7 +280,7 @@ var _ = Describe("RKE2 Agent Config", func() {
 				LoadBalancerPort:      1234,
 				NodeLabels:            []string{"testlabel"},
 				NodeTaints:            []string{"testtaint"},
-				CISProfile:            bootstrapv1.CIS1_23, //nolint:nosnakecase
+				CISProfile:            bootstrapv1.CIS, //nolint:nosnakecase
 				ProtectKernelDefaults: true,
 				ResolvConf: &corev1.ObjectReference{
 					Name:      "test",

@@ -133,6 +133,7 @@ spec:
                             description: CISProfile activates CIS compliance of RKE2
                               for a certain profile
                             enum:
+                            - cis
                             - cis-1.23
                             - cis-1.5
                             - cis-1.6

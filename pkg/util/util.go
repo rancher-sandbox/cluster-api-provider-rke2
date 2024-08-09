@@ -201,6 +201,8 @@ func ProfileCompliant(profile bootstrapv1.CISProfile, version string) bool {
 	}
 
 	switch profile {
+	case bootstrapv1.CIS:
+		return isAtLeastv125
 	case bootstrapv1.CIS1_23:
 		return isAtLeastv125
 	case bootstrapv1.CIS1_5:
